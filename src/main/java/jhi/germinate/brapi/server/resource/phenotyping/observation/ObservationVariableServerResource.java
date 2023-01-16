@@ -85,13 +85,9 @@ public class ObservationVariableServerResource extends BaseServerResource implem
 							vv.setCategories(categories);
 						}
 						if (restrictions.getMin() != null)
-						{
 							vv.setMinimumValue(Integer.toString((int) Math.floor(restrictions.getMin())));
-						}
-						if (restrictions.getMin() != null)
-						{
+						if (restrictions.getMax() != null)
 							vv.setMaximumValue(Integer.toString((int) Math.ceil(restrictions.getMax())));
-						}
 
 						scale.setValidValues(vv);
 					}
