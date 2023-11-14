@@ -29,7 +29,6 @@ import static jhi.germinate.server.database.codegen.tables.Datasetmembers.*;
 import static jhi.germinate.server.database.codegen.tables.Datasets.*;
 import static jhi.germinate.server.database.codegen.tables.Germinatebase.*;
 import static jhi.germinate.server.database.codegen.tables.Markers.*;
-import static jhi.germinate.server.database.codegen.tables.ViewTableMarkers.*;
 
 @Path("brapi/v2/variants")
 @Secured
@@ -55,7 +54,7 @@ public class VariantServerResource extends BaseServerResource implements BrapiVa
 			List<Condition> conditions = new ArrayList<>();
 
 			if (!StringUtils.isEmpty(variantDbId))
-				conditions.add(DSL.concat(DATASETMEMBERS.DATASET_ID, DSL.val("-"), VIEW_TABLE_MARKERS.MARKER_ID).eq(variantDbId));
+				conditions.add(DSL.concat(DATASETMEMBERS.DATASET_ID, DSL.val("-"), MARKERS.ID).eq(variantDbId));
 			// TODO: Other parameters
 
 			List<Variant> variants = getVariantsInternal(context, conditions, page, pageSize, req, resp, securityContext);
@@ -78,7 +77,7 @@ public class VariantServerResource extends BaseServerResource implements BrapiVa
 		try (Connection conn = Database.getConnection())
 		{
 			DSLContext context = Database.getContext(conn);
-			List<Variant> variants = getVariantsInternal(context, Collections.singletonList(DSL.concat(DATASETMEMBERS.DATASET_ID, DSL.val("-"), VIEW_TABLE_MARKERS.MARKER_ID).eq(variantDbId)), page, pageSize, req, resp, securityContext);
+			List<Variant> variants = getVariantsInternal(context, Collections.singletonList(DSL.concat(DATASETMEMBERS.DATASET_ID, DSL.val("-"), MARKERS.ID).eq(variantDbId)), page, pageSize, req, resp, securityContext);
 
 			if (CollectionUtils.isEmpty(variants))
 				return new BaseResult<>(null, page, pageSize, 0);

@@ -116,6 +116,7 @@ public class ObservationUnitBaseServerResource extends BaseServerResource
 						o.setObservationVariableDbId(ud.getObservationVariableDbId());
 						o.setObservationVariableName(ud.getObservationVariableName());
 						o.setStudyDbId(d.getStudyDbId());
+						o.setValue(ud.getValue());
 						Timestamp t = ud.getObservationTimeStamp();
 						if (t != null)
 							o.setObservationTimeStamp(sdf.format(t));

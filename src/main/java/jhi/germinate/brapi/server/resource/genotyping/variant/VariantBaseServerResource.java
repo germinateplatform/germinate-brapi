@@ -12,11 +12,12 @@ import jakarta.ws.rs.core.SecurityContext;
 import java.sql.*;
 import java.text.SimpleDateFormat;
 import java.util.*;
-import java.util.Date;
 import java.util.stream.Collectors;
 
 import static jhi.germinate.server.database.codegen.tables.Datasetmembers.*;
-import static jhi.germinate.server.database.codegen.tables.ViewTableMarkers.*;
+import static jhi.germinate.server.database.codegen.tables.Markers.MARKERS;
+import static jhi.germinate.server.database.codegen.tables.Markertypes.MARKERTYPES;
+import static jhi.germinate.server.database.codegen.tables.Synonyms.SYNONYMS;
 
 public interface VariantBaseServerResource
 {
@@ -31,7 +32,9 @@ public interface VariantBaseServerResource
 		SelectConditionStep<?> step = context.select()
 											 .hint("SQL_CALC_FOUND_ROWS")
 											 .from(DATASETMEMBERS)
-											 .leftJoin(VIEW_TABLE_MARKERS).on(DATASETMEMBERS.FOREIGN_ID.eq(VIEW_TABLE_MARKERS.MARKER_ID))
+											 .leftJoin(MARKERS).on(DATASETMEMBERS.FOREIGN_ID.eq(MARKERS.ID))
+											 .leftJoin(MARKERTYPES).on(MARKERS.MARKERTYPE_ID.eq(MARKERTYPES.ID))
+											 .leftJoin(SYNONYMS).on(SYNONYMS.SYNONYMTYPE_ID.eq(2).and(SYNONYMS.FOREIGN_ID.eq(MARKERS.ID)))
 											 .where(DATASETMEMBERS.DATASET_ID.in(datasetIds))
 											 .and(DATASETMEMBERS.DATASETMEMBERTYPE_ID.eq(1));
 
@@ -46,18 +49,16 @@ public interface VariantBaseServerResource
 				   .stream()
 				   .map(m -> {
 					   Variant result = new Variant()
-						   .setVariantDbId(m.get(DATASETMEMBERS.DATASET_ID) + "-" + m.get(VIEW_TABLE_MARKERS.MARKER_ID))
-						   .setCreated(m.get(VIEW_TABLE_MARKERS.CREATED_ON, String.class))
-						   .setUpdated(m.get(VIEW_TABLE_MARKERS.UPDATED_ON, String.class))
-						   .setVariantType(m.get(VIEW_TABLE_MARKERS.MARKER_TYPE));
+						   .setVariantDbId(m.get(DATASETMEMBERS.DATASET_ID) + "-" + m.get(MARKERS.ID))
+						   .setCreated(m.get(MARKERS.CREATED_ON, String.class))
+						   .setUpdated(m.get(MARKERS.UPDATED_ON, String.class))
+						   .setVariantType(m.get(MARKERTYPES.DESCRIPTION));
 
 					   List<String> names = new ArrayList<>();
-					   names.add(m.get(VIEW_TABLE_MARKERS.MARKER_NAME));
+					   names.add(m.get(MARKERS.MARKER_NAME));
 
-					   if (m.get(VIEW_TABLE_MARKERS.MARKER_SYNONYMS) != null)
-					   {
-						   Collections.addAll(names, m.get(VIEW_TABLE_MARKERS.MARKER_SYNONYMS));
-					   }
+					   if (m.get(SYNONYMS.SYNONYMS_) != null)
+						   Collections.addAll(names, m.get(SYNONYMS.SYNONYMS_));
 
 					   result.setVariantNames(names);
 					   result.setVariantSetDbId(Collections.singletonList(Integer.toString(m.get(DATASETMEMBERS.DATASET_ID))));

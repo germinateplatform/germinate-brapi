@@ -3,7 +3,7 @@ plugins {
 }
 
 group 'uk.ac.hutton.germinate.brapi'
-version '4.6.0'
+version '4.7.0'
 
 sourceCompatibility = 11
 
@@ -20,7 +20,7 @@ repositories {
 dependencies {
     compile fileTree(dir: 'lib', include: ['*.jar'])
 
-    implementation 'org.json:json:20220320'
+    implementation 'org.json:json:20230227'
 
     implementation 'ch.systems.cisd:jhdf5:14.12.0'
 
