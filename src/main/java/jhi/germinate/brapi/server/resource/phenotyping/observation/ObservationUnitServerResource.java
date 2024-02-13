@@ -6,10 +6,10 @@ import jakarta.ws.rs.core.*;
 import jhi.germinate.resource.enums.UserType;
 import jhi.germinate.server.*;
 import jhi.germinate.server.database.codegen.tables.pojos.Datasets;
-import jhi.germinate.server.database.codegen.tables.records.PhenotypedataRecord;
+import jhi.germinate.server.database.codegen.tables.records.*;
 import jhi.germinate.server.resource.datasets.DatasetTableResource;
 import jhi.germinate.server.util.*;
-import org.jooq.DSLContext;
+import org.jooq.*;
 import uk.ac.hutton.ics.brapi.resource.base.*;
 import uk.ac.hutton.ics.brapi.resource.phenotyping.observation.*;
 import uk.ac.hutton.ics.brapi.server.phenotyping.observation.BrapiObservationUnitServerResource;
@@ -19,8 +19,9 @@ import java.sql.*;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
-import static jhi.germinate.server.database.codegen.tables.Datasets.*;
-import static jhi.germinate.server.database.codegen.tables.Phenotypedata.*;
+import static jhi.germinate.server.database.codegen.tables.Datasets.DATASETS;
+import static jhi.germinate.server.database.codegen.tables.Phenotypedata.PHENOTYPEDATA;
+import static jhi.germinate.server.database.codegen.tables.Trialsetup.TRIALSETUP;
 
 @Path("brapi/v2/observationunits")
 public class ObservationUnitServerResource extends ObservationUnitBaseServerResource implements BrapiObservationUnitServerResource
@@ -49,10 +50,73 @@ public class ObservationUnitServerResource extends ObservationUnitBaseServerReso
 																		@QueryParam("germplasmDbId") String germplasmDbId,
 																		@QueryParam("externalReferenceId") String externalReferenceId,
 																		@QueryParam("externalReferenceSource") String externalReferenceSource)
-		throws IOException, SQLException
+			throws IOException, SQLException
 	{
-		resp.sendError(Response.Status.NOT_IMPLEMENTED.getStatusCode());
-		return null;
+		try (Connection conn = Database.getConnection())
+		{
+			DSLContext context = Database.getContext(conn);
+
+			List<Condition> conditions = new ArrayList<>();
+
+			if (!StringUtils.isEmpty(observationUnitDbId))
+			{
+				String[] parts = observationUnitDbId.split("-", -1);
+
+				if (parts.length == 5)
+				{
+					try
+					{
+						conditions.add(TRIALSETUP.GERMINATEBASE_ID.eq(Integer.parseInt(parts[0])));
+						conditions.add(TRIALSETUP.DATASET_ID.eq(Integer.parseInt(parts[1])));
+						conditions.add(TRIALSETUP.REP.isNotDistinctFrom(parts[2]));
+
+						try
+						{
+							conditions.add(TRIALSETUP.TRIAL_COLUMN.isNotDistinctFrom(Short.parseShort(parts[3])));
+						}
+						catch (Exception ex)
+						{
+						}
+						try
+						{
+							conditions.add(TRIALSETUP.TRIAL_ROW.isNotDistinctFrom(Short.parseShort(parts[4])));
+						}
+						catch (Exception ex)
+						{
+						}
+					}
+					catch (Exception e)
+					{
+						e.printStackTrace();
+					}
+				}
+			}
+			if (!StringUtils.isEmpty(germplasmDbId))
+			{
+				try
+				{
+					conditions.add(TRIALSETUP.GERMINATEBASE_ID.eq(Integer.parseInt(germplasmDbId)));
+				}
+				catch (Exception ex)
+				{
+				}
+			}
+			if (!StringUtils.isEmpty(studyDbId)) {
+				try
+				{
+					conditions.add(TRIALSETUP.DATASET_ID.eq(Integer.parseInt(studyDbId)));
+				}
+				catch (Exception ex)
+				{
+				}
+			}
+
+			boolean io = true;
+			if (!StringUtils.isEmpty(includeObservations))
+				io = Boolean.parseBoolean(includeObservations);
+
+			return getObservationUnitsBase(context, conditions, io);
+		}
 	}
 
 	@POST
@@ -60,13 +124,13 @@ public class ObservationUnitServerResource extends ObservationUnitBaseServerReso
 	@Produces(MediaType.APPLICATION_JSON)
 	@Secured(UserType.DATA_CURATOR)
 	public BaseResult<ArrayResult<ObservationUnit>> postObservationUnits(List<ObservationUnit> newObservationUnits)
-		throws IOException, SQLException
+			throws IOException, SQLException
 	{
 		if (CollectionUtils.isEmpty(newObservationUnits))
 		{
 			return new BaseResult<ArrayResult<ObservationUnit>>()
-				.setResult(new ArrayResult<ObservationUnit>()
-					.setData(new ArrayList<>()));
+					.setResult(new ArrayResult<ObservationUnit>()
+									   .setData(new ArrayList<>()));
 		}
 
 		// Check that all requested study ids are valid and the user has permissions
@@ -177,15 +241,13 @@ public class ObservationUnitServerResource extends ObservationUnitBaseServerReso
 						if (dataset == null)
 							continue;
 
-						PhenotypedataRecord pd = context.newRecord(PHENOTYPEDATA);
-						pd.setDatasetId(dataset.getId());
-						pd.setGerminatebaseId(Integer.parseInt(o.getGermplasmDbId()));
-						pd.setPhenotypeId(Integer.parseInt(o.getObservationVariableDbId()));
-						pd.setPhenotypeValue(o.getValue());
-						pd.setRep(rep);
-						pd.setBlock("1");
-						pd.setTrialRow(row);
-						pd.setTrialColumn(col);
+						TrialsetupRecord ts = context.newRecord(TRIALSETUP);
+						ts.setGerminatebaseId(Integer.parseInt(o.getGermplasmDbId()));
+						ts.setTrialRow(row);
+						ts.setTrialColumn(col);
+						ts.setRep(rep);
+						ts.setDatasetId(dataset.getId());
+
 						if (o.getGeoCoordinates() != null)
 						{
 							if (o.getGeoCoordinates().getGeometry() != null)
@@ -196,13 +258,64 @@ public class ObservationUnitServerResource extends ObservationUnitBaseServerReso
 
 									if (coords.length == 3)
 									{
-										pd.setLatitude(toBigDecimal(coords[0]));
-										pd.setLongitude(toBigDecimal(coords[1]));
-										pd.setElevation(toBigDecimal(coords[2]));
+										ts.setLatitude(toBigDecimal(coords[0]));
+										ts.setLongitude(toBigDecimal(coords[1]));
+										ts.setElevation(toBigDecimal(coords[2]));
 									}
 								}
 							}
 						}
+
+						if (o.getAdditionalInfo() != null)
+						{
+							try
+							{
+								ts.setTrialRow(Short.parseShort(o.getAdditionalInfo().get("row")));
+							}
+							catch (Exception e)
+							{
+								// Ignore
+							}
+							try
+							{
+								ts.setTrialColumn(Short.parseShort(o.getAdditionalInfo().get("column")));
+							}
+							catch (Exception e)
+							{
+								// Ignore
+							}
+							try
+							{
+								ts.setRep(o.getAdditionalInfo().get("rep"));
+							}
+							catch (Exception e)
+							{
+								// Ignore
+							}
+						}
+
+						SelectConditionStep<TrialsetupRecord> step = context.selectFrom(TRIALSETUP)
+																			.where(TRIALSETUP.GERMINATEBASE_ID.eq(ts.getGerminatebaseId()))
+																			.and(TRIALSETUP.DATASET_ID.eq(ts.getDatasetId()))
+																			.and(TRIALSETUP.LATITUDE.isNotDistinctFrom(ts.getLatitude()))
+																			.and(TRIALSETUP.LONGITUDE.isNotDistinctFrom(ts.getLongitude()))
+																			.and(TRIALSETUP.ELEVATION.isNotDistinctFrom(ts.getElevation()))
+																			.and(TRIALSETUP.TRIAL_ROW.isNotDistinctFrom(ts.getTrialRow()))
+																			.and(TRIALSETUP.TRIAL_COLUMN.isNotDistinctFrom(ts.getTrialColumn()))
+																			.and(TRIALSETUP.REP.isNotDistinctFrom(ts.getRep()));
+
+						TrialsetupRecord temp = step.fetchAny();
+
+						if (temp != null)
+							ts = temp;
+						else
+							ts.store();
+
+
+						PhenotypedataRecord pd = context.newRecord(PHENOTYPEDATA);
+						pd.setTrialsetupId(ts.getId());
+						pd.setPhenotypeId(Integer.parseInt(o.getObservationVariableDbId()));
+						pd.setPhenotypeValue(o.getValue());
 						try
 						{
 							pd.setRecordingDate(new Timestamp(sdf.parse(o.getObservationTimeStamp()).getTime()));
@@ -229,20 +342,14 @@ public class ObservationUnitServerResource extends ObservationUnitBaseServerReso
 						if (isMultiTrait)
 						{
 							// Check if there's already an entry for the same plot, trait and timepoint and value
-							PhenotypedataRecord pdOld = context.selectFrom(PHENOTYPEDATA)
+							PhenotypedataRecord pdOld = context.select()
+															   .from(PHENOTYPEDATA)
+															   .leftJoin(TRIALSETUP).on(TRIALSETUP.ID.eq(PHENOTYPEDATA.TRIALSETUP_ID))
 															   .where(PHENOTYPEDATA.PHENOTYPE_ID.isNotDistinctFrom(pd.getPhenotypeId()))
-															   .and(PHENOTYPEDATA.REP.isNotDistinctFrom(pd.getRep()))
-															   .and(PHENOTYPEDATA.BLOCK.isNotDistinctFrom(pd.getBlock()))
-															   .and(PHENOTYPEDATA.TRIAL_ROW.isNotDistinctFrom(pd.getTrialRow()))
-															   .and(PHENOTYPEDATA.TRIAL_COLUMN.isNotDistinctFrom(pd.getTrialColumn()))
-															   .and(PHENOTYPEDATA.TREATMENT_ID.isNotDistinctFrom(pd.getTreatmentId()))
-															   .and(PHENOTYPEDATA.GERMINATEBASE_ID.isNotDistinctFrom(pd.getGerminatebaseId()))
-															   .and(PHENOTYPEDATA.DATASET_ID.isNotDistinctFrom(pd.getDatasetId()))
+															   .and(TRIALSETUP.ID.eq(ts.getId()))
 															   .and(PHENOTYPEDATA.RECORDING_DATE.isNotDistinctFrom(pd.getRecordingDate()))
-															   .and(PHENOTYPEDATA.LOCATION_ID.isNotDistinctFrom(pd.getLocationId()))
-															   .and(PHENOTYPEDATA.TRIALSERIES_ID.isNotDistinctFrom(pd.getTrialseriesId()))
 															   .and(PHENOTYPEDATA.PHENOTYPE_VALUE.eq(pd.getPhenotypeValue()))
-															   .fetchAny();
+															   .fetchAnyInto(PhenotypedataRecord.class);
 
 							if (pdOld == null)
 							{
@@ -257,19 +364,12 @@ public class ObservationUnitServerResource extends ObservationUnitBaseServerReso
 						else
 						{
 							// Otherwise, check if there's a match when ignoring the value. Single traits get their values updated if different
-							List<PhenotypedataRecord> matches = context.selectFrom(PHENOTYPEDATA)
+							List<PhenotypedataRecord> matches = context.select()
+																	   .from(PHENOTYPEDATA)
+																	   .leftJoin(TRIALSETUP).on(TRIALSETUP.ID.eq(PHENOTYPEDATA.TRIALSETUP_ID))
 																	   .where(PHENOTYPEDATA.PHENOTYPE_ID.isNotDistinctFrom(pd.getPhenotypeId()))
-																	   .and(PHENOTYPEDATA.REP.isNotDistinctFrom(pd.getRep()))
-																	   .and(PHENOTYPEDATA.BLOCK.isNotDistinctFrom(pd.getBlock()))
-																	   .and(PHENOTYPEDATA.TRIAL_ROW.isNotDistinctFrom(pd.getTrialRow()))
-																	   .and(PHENOTYPEDATA.TRIAL_COLUMN.isNotDistinctFrom(pd.getTrialColumn()))
-																	   .and(PHENOTYPEDATA.TREATMENT_ID.isNotDistinctFrom(pd.getTreatmentId()))
-																	   .and(PHENOTYPEDATA.GERMINATEBASE_ID.isNotDistinctFrom(pd.getGerminatebaseId()))
-																	   .and(PHENOTYPEDATA.DATASET_ID.isNotDistinctFrom(pd.getDatasetId()))
-//																	   .and(PHENOTYPEDATA.RECORDING_DATE.isNotDistinctFrom(pd.getRecordingDate()))
-																	   .and(PHENOTYPEDATA.LOCATION_ID.isNotDistinctFrom(pd.getLocationId()))
-																	   .and(PHENOTYPEDATA.TRIALSERIES_ID.isNotDistinctFrom(pd.getTrialseriesId()))
-																	   .fetch();
+																	   .and(TRIALSETUP.ID.eq(ts.getId()))
+																	   .fetchInto(PhenotypedataRecord.class);
 
 							if (!CollectionUtils.isEmpty(matches))
 							{
@@ -300,7 +400,7 @@ public class ObservationUnitServerResource extends ObservationUnitBaseServerReso
 
 			page = 0;
 			pageSize = Integer.MAX_VALUE;
-			return getObservationUnitsBase(context, Collections.singletonList(PHENOTYPEDATA.ID.in(newIds)));
+			return getObservationUnitsBase(context, Collections.singletonList(PHENOTYPEDATA.ID.in(newIds)), true);
 		}
 	}
 
@@ -309,7 +409,7 @@ public class ObservationUnitServerResource extends ObservationUnitBaseServerReso
 	@Produces(MediaType.APPLICATION_JSON)
 	@Secured(UserType.DATA_CURATOR)
 	public BaseResult<ArrayResult<ObservationUnit>> putObservationUnits(Map<String, ObservationUnit> observationUnits)
-		throws IOException, SQLException
+			throws IOException, SQLException
 	{
 		resp.sendError(Response.Status.NOT_IMPLEMENTED.getStatusCode());
 		return null;
@@ -336,7 +436,7 @@ public class ObservationUnitServerResource extends ObservationUnitBaseServerReso
 											@QueryParam("observationUnitLevelRelationshipOrder") String observationUnitLevelRelationshipOrder,
 											@QueryParam("observationUnitLevelRelationshipCode") String observationUnitLevelRelationshipCode,
 											@QueryParam("observationUnitLevelRelationshipDbId") String observationUnitLevelRelationshipDbId)
-		throws IOException, SQLException
+			throws IOException, SQLException
 	{
 		resp.sendError(Response.Status.NOT_IMPLEMENTED.getStatusCode());
 		return null;
@@ -349,7 +449,7 @@ public class ObservationUnitServerResource extends ObservationUnitBaseServerReso
 	@Secured
 	@PermitAll
 	public BaseResult<ObservationUnit> getObservationUnitById(@PathParam("observationUnitDbId") String observationUnitDbId)
-		throws IOException, SQLException
+			throws IOException, SQLException
 	{
 		resp.sendError(Response.Status.NOT_IMPLEMENTED.getStatusCode());
 		return null;
@@ -361,7 +461,7 @@ public class ObservationUnitServerResource extends ObservationUnitBaseServerReso
 	@Produces(MediaType.APPLICATION_JSON)
 	@Secured(UserType.DATA_CURATOR)
 	public BaseResult<ObservationUnit> putObservationUnitById(@PathParam("observationUnitDbId") String observationUnitDbId, ObservationUnit observationUnit)
-		throws IOException, SQLException
+			throws IOException, SQLException
 	{
 		resp.sendError(Response.Status.NOT_IMPLEMENTED.getStatusCode());
 		return null;

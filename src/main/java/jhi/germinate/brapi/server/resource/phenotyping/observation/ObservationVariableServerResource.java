@@ -24,6 +24,7 @@ import java.util.*;
 import static jhi.germinate.server.database.codegen.tables.Datasets.*;
 import static jhi.germinate.server.database.codegen.tables.Phenotypedata.*;
 import static jhi.germinate.server.database.codegen.tables.Phenotypes.*;
+import static jhi.germinate.server.database.codegen.tables.Trialsetup.TRIALSETUP;
 import static jhi.germinate.server.database.codegen.tables.Units.*;
 
 @Path("brapi/v2/variables")
@@ -204,7 +205,7 @@ public class ObservationVariableServerResource extends ObservationVariableBaseSe
 						resp.sendError(Response.Status.FORBIDDEN.getStatusCode());
 						return null;
 					}
-					conditions.add(DSL.exists(DSL.selectOne().from(PHENOTYPEDATA).where(PHENOTYPEDATA.DATASET_ID.eq(datasetId)).and(PHENOTYPEDATA.PHENOTYPE_ID.eq(PHENOTYPES.ID))));
+					conditions.add(DSL.exists(DSL.selectOne().from(PHENOTYPEDATA).leftJoin(TRIALSETUP).on(TRIALSETUP.ID.eq(PHENOTYPEDATA.TRIALSETUP_ID)).where(TRIALSETUP.DATASET_ID.eq(datasetId)).and(PHENOTYPEDATA.PHENOTYPE_ID.eq(PHENOTYPES.ID))));
 				}
 				catch (NumberFormatException e)
 				{
@@ -216,7 +217,7 @@ public class ObservationVariableServerResource extends ObservationVariableBaseSe
 				try
 				{
 					Integer experimentId = Integer.parseInt(studyDbId);
-					conditions.add(DSL.exists(DSL.selectOne().from(PHENOTYPEDATA).leftJoin(DATASETS).on(DATASETS.ID.eq(PHENOTYPEDATA.DATASET_ID)).where(DATASETS.EXPERIMENT_ID.eq(experimentId)).and(PHENOTYPEDATA.PHENOTYPE_ID.eq(PHENOTYPES.ID))));
+					conditions.add(DSL.exists(DSL.selectOne().from(PHENOTYPEDATA).leftJoin(TRIALSETUP).on(TRIALSETUP.ID.eq(PHENOTYPEDATA.TRIALSETUP_ID)).leftJoin(DATASETS).on(DATASETS.ID.eq(TRIALSETUP.DATASET_ID)).where(DATASETS.EXPERIMENT_ID.eq(experimentId)).and(PHENOTYPEDATA.PHENOTYPE_ID.eq(PHENOTYPES.ID))));
 				}
 				catch (NumberFormatException e)
 				{

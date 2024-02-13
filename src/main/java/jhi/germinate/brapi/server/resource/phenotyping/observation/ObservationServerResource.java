@@ -5,7 +5,7 @@ import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.*;
 import jhi.germinate.server.Database;
 import jhi.germinate.server.database.codegen.tables.pojos.Datasets;
-import jhi.germinate.server.database.codegen.tables.records.PhenotypedataRecord;
+import jhi.germinate.server.database.codegen.tables.records.*;
 import jhi.germinate.server.util.*;
 import org.jooq.*;
 import uk.ac.hutton.ics.brapi.resource.base.*;
@@ -17,24 +17,27 @@ import java.sql.*;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
-import static jhi.germinate.server.database.codegen.tables.Datasets.*;
-import static jhi.germinate.server.database.codegen.tables.Germinatebase.*;
-import static jhi.germinate.server.database.codegen.tables.Phenotypedata.*;
-import static jhi.germinate.server.database.codegen.tables.Phenotypes.*;
+import static jhi.germinate.server.database.codegen.tables.Datasets.DATASETS;
+import static jhi.germinate.server.database.codegen.tables.Germinatebase.GERMINATEBASE;
+import static jhi.germinate.server.database.codegen.tables.Phenotypedata.PHENOTYPEDATA;
+import static jhi.germinate.server.database.codegen.tables.Phenotypes.PHENOTYPES;
+import static jhi.germinate.server.database.codegen.tables.Trialsetup.TRIALSETUP;
 
 @Path("brapi/v2/observations")
 @Secured
 @PermitAll
 public class ObservationServerResource extends ObservationBaseServerResource implements BrapiObservationServerResource
 {
-	private void addCondition(List<Condition> conditions, Field<Integer> field, String value) {
+	private void addCondition(List<Condition> conditions, Field<Integer> field, String value)
+	{
 		if (!StringUtils.isEmpty(value))
 		{
 			try
 			{
 				conditions.add(field.eq(Integer.parseInt(value)));
 			}
-			catch (Exception e) {
+			catch (Exception e)
+			{
 				// Do nothing
 			}
 		}
@@ -45,29 +48,29 @@ public class ObservationServerResource extends ObservationBaseServerResource imp
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	public BaseResult<ArrayResult<Observation>> getObservations(
-		@QueryParam("observationDbId") String observationDbId,
-		@QueryParam("observationUnitDbId") String observationUnitDbId,
-		@QueryParam("observationVariableDbId") String observationVariableDbId,
-		@QueryParam("locationDbId") String locationDbId,
-		@QueryParam("seasonDbId") String seasonDbId,
-		@QueryParam("observationTimeStampRangeStart") String observationTimeStampRangeStart,
-		@QueryParam("observationTimeStampRangeEnd") String observationTimeStampRangeEnd,
-		@QueryParam("observationUnitLevelName") String observationUnitLevelName,
-		@QueryParam("observationUnitLevelOrder") String observationUnitLevelOrder,
-		@QueryParam("observationUnitLevelCode") String observationUnitLevelCode,
-		@QueryParam("observationUnitLevelRelationshipName") String observationUnitLevelRelationshipName,
-		@QueryParam("observationUnitLevelRelationshipOrder") String observationUnitLevelRelationshipOrder,
-		@QueryParam("observationUnitLevelRelationshipCode") String observationUnitLevelRelationshipCode,
-		@QueryParam("observationUnitLevelRelationshipDbId") String observationUnitLevelRelationshipDbId,
-		@QueryParam("commonCropName") String commonCropName,
-		@QueryParam("programDbId") String programDbId,
-		@QueryParam("trialDbId") String trialDbId,
-		@QueryParam("studyDbId") String studyDbId,
-		@QueryParam("germplasmDbId") String germplasmDbId,
-		@QueryParam("externalReferenceId") String externalReferenceId,
-		@QueryParam("externalReferenceSource") String externalReferenceSource
+			@QueryParam("observationDbId") String observationDbId,
+			@QueryParam("observationUnitDbId") String observationUnitDbId,
+			@QueryParam("observationVariableDbId") String observationVariableDbId,
+			@QueryParam("locationDbId") String locationDbId,
+			@QueryParam("seasonDbId") String seasonDbId,
+			@QueryParam("observationTimeStampRangeStart") String observationTimeStampRangeStart,
+			@QueryParam("observationTimeStampRangeEnd") String observationTimeStampRangeEnd,
+			@QueryParam("observationUnitLevelName") String observationUnitLevelName,
+			@QueryParam("observationUnitLevelOrder") String observationUnitLevelOrder,
+			@QueryParam("observationUnitLevelCode") String observationUnitLevelCode,
+			@QueryParam("observationUnitLevelRelationshipName") String observationUnitLevelRelationshipName,
+			@QueryParam("observationUnitLevelRelationshipOrder") String observationUnitLevelRelationshipOrder,
+			@QueryParam("observationUnitLevelRelationshipCode") String observationUnitLevelRelationshipCode,
+			@QueryParam("observationUnitLevelRelationshipDbId") String observationUnitLevelRelationshipDbId,
+			@QueryParam("commonCropName") String commonCropName,
+			@QueryParam("programDbId") String programDbId,
+			@QueryParam("trialDbId") String trialDbId,
+			@QueryParam("studyDbId") String studyDbId,
+			@QueryParam("germplasmDbId") String germplasmDbId,
+			@QueryParam("externalReferenceId") String externalReferenceId,
+			@QueryParam("externalReferenceSource") String externalReferenceSource
 	)
-		throws IOException, SQLException
+			throws IOException, SQLException
 	{
 		try (Connection conn = Database.getConnection())
 		{
@@ -76,7 +79,7 @@ public class ObservationServerResource extends ObservationBaseServerResource imp
 
 			addCondition(conditions, DATASETS.ID, studyDbId);
 			addCondition(conditions, DATASETS.EXPERIMENT_ID, trialDbId);
-			addCondition(conditions, PHENOTYPEDATA.GERMINATEBASE_ID, germplasmDbId);
+			addCondition(conditions, TRIALSETUP.GERMINATEBASE_ID, germplasmDbId);
 			addCondition(conditions, PHENOTYPES.ID, observationVariableDbId);
 
 			return getObservation(context, conditions);
@@ -88,13 +91,13 @@ public class ObservationServerResource extends ObservationBaseServerResource imp
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	public BaseResult<ArrayResult<Observation>> postObservations(List<Observation> newObservations)
-		throws IOException, SQLException
+			throws IOException, SQLException
 	{
 		if (CollectionUtils.isEmpty(newObservations))
 		{
 			return new BaseResult<ArrayResult<Observation>>()
-				.setResult(new ArrayResult<Observation>()
-					.setData(new ArrayList<>()));
+					.setResult(new ArrayResult<Observation>()
+									   .setData(new ArrayList<>()));
 		}
 
 		Set<Integer> traitIds = new HashSet<>();
@@ -163,11 +166,10 @@ public class ObservationServerResource extends ObservationBaseServerResource imp
 
 			for (Observation n : newObservations)
 			{
-				PhenotypedataRecord pd = context.newRecord(PHENOTYPEDATA);
-				pd.setDatasetId(dataset.getId());
-				pd.setGerminatebaseId(Integer.parseInt(n.getGermplasmDbId()));
-				pd.setPhenotypeId(Integer.parseInt(n.getObservationVariableDbId()));
-				pd.setPhenotypeValue(n.getValue());
+				TrialsetupRecord ts = context.newRecord(TRIALSETUP);
+				ts.setGerminatebaseId(Integer.parseInt(n.getGermplasmDbId()));
+				ts.setDatasetId(dataset.getId());
+
 				if (n.getGeoCoordinates() != null)
 				{
 					if (n.getGeoCoordinates().getGeometry() != null)
@@ -178,18 +180,19 @@ public class ObservationServerResource extends ObservationBaseServerResource imp
 
 							if (coords.length == 3)
 							{
-								pd.setLatitude(toBigDecimal(coords[0]));
-								pd.setLongitude(toBigDecimal(coords[1]));
-								pd.setElevation(toBigDecimal(coords[2]));
+								ts.setLatitude(toBigDecimal(coords[0]));
+								ts.setLongitude(toBigDecimal(coords[1]));
+								ts.setElevation(toBigDecimal(coords[2]));
 							}
 						}
 					}
 				}
+
 				if (n.getAdditionalInfo() != null)
 				{
 					try
 					{
-						pd.setTrialRow(Short.parseShort(n.getAdditionalInfo().get("row")));
+						ts.setTrialRow(Short.parseShort(n.getAdditionalInfo().get("row")));
 					}
 					catch (Exception e)
 					{
@@ -197,7 +200,7 @@ public class ObservationServerResource extends ObservationBaseServerResource imp
 					}
 					try
 					{
-						pd.setTrialColumn(Short.parseShort(n.getAdditionalInfo().get("column")));
+						ts.setTrialColumn(Short.parseShort(n.getAdditionalInfo().get("column")));
 					}
 					catch (Exception e)
 					{
@@ -205,13 +208,35 @@ public class ObservationServerResource extends ObservationBaseServerResource imp
 					}
 					try
 					{
-						pd.setRep(n.getAdditionalInfo().get("rep"));
+						ts.setRep(n.getAdditionalInfo().get("rep"));
 					}
 					catch (Exception e)
 					{
 						// Ignore
 					}
 				}
+
+				SelectConditionStep<TrialsetupRecord> step = context.selectFrom(TRIALSETUP)
+																	.where(TRIALSETUP.GERMINATEBASE_ID.eq(ts.getGerminatebaseId()))
+																	.and(TRIALSETUP.DATASET_ID.eq(ts.getDatasetId()))
+																	.and(TRIALSETUP.LATITUDE.isNotDistinctFrom(ts.getLatitude()))
+																	.and(TRIALSETUP.LONGITUDE.isNotDistinctFrom(ts.getLongitude()))
+																	.and(TRIALSETUP.ELEVATION.isNotDistinctFrom(ts.getElevation()))
+																	.and(TRIALSETUP.TRIAL_ROW.isNotDistinctFrom(ts.getTrialRow()))
+																	.and(TRIALSETUP.TRIAL_COLUMN.isNotDistinctFrom(ts.getTrialColumn()))
+																	.and(TRIALSETUP.REP.isNotDistinctFrom(ts.getRep()));
+
+				TrialsetupRecord temp = step.fetchAny();
+
+				if (temp != null)
+					ts = temp;
+				else
+					ts.store();
+
+				PhenotypedataRecord pd = context.newRecord(PHENOTYPEDATA);
+				pd.setTrialsetupId(ts.getId());
+				pd.setPhenotypeId(Integer.parseInt(n.getObservationVariableDbId()));
+				pd.setPhenotypeValue(n.getValue());
 				try
 				{
 					pd.setRecordingDate(new Timestamp(sdf.parse(n.getObservationTimeStamp()).getTime()));
@@ -220,7 +245,6 @@ public class ObservationServerResource extends ObservationBaseServerResource imp
 				{
 					// Ignore
 				}
-
 				pd.store();
 
 				newIds.add(pd.getId());
@@ -239,7 +263,7 @@ public class ObservationServerResource extends ObservationBaseServerResource imp
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	public BaseResult<ArrayResult<Observation>> putObservations(Map<String, Observation> observations)
-		throws IOException, SQLException
+			throws IOException, SQLException
 	{
 		resp.sendError(Response.Status.BAD_REQUEST.getStatusCode());
 		return null;
@@ -251,25 +275,25 @@ public class ObservationServerResource extends ObservationBaseServerResource imp
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	public Response getObservationTable(
-		@QueryParam("observationUnitDbId") String observationUnitDbId,
-		@QueryParam("observationVariableDbId") String observationVariableDbId,
-		@QueryParam("locationDbId") String locationDbId,
-		@QueryParam("seasonDbId") String seasonDbId,
-		@QueryParam("searchResultsDbId") String searchResultsDbId,
-		@QueryParam("observationTimeStampRangeStart") String observationTimeStampRangeStart,
-		@QueryParam("observationTimeStampRangeEnd") String observationTimeStampRangeEnd,
-		@QueryParam("programDbId") String programDbId,
-		@QueryParam("trialDbId") String trialDbId,
-		@QueryParam("studyDbId") String studyDbId,
-		@QueryParam("germplasmDbId") String germplasmDbId,
-		@QueryParam("observationUnitLevelName") String observationUnitLevelName,
-		@QueryParam("observationUnitLevelOrder") String observationUnitLevelOrder,
-		@QueryParam("observationUnitLevelCode") String observationUnitLevelCode,
-		@QueryParam("observationUnitLevelRelationshipName") String observationUnitLevelRelationshipName,
-		@QueryParam("observationUnitLevelRelationshipOrder") String observationUnitLevelRelationshipOrder,
-		@QueryParam("observationUnitLevelRelationshipCode") String observationUnitLevelRelationshipCode,
-		@QueryParam("observationUnitLevelRelationshipDbId") String observationUnitLevelRelationshipDbId)
-		throws IOException, SQLException
+			@QueryParam("observationUnitDbId") String observationUnitDbId,
+			@QueryParam("observationVariableDbId") String observationVariableDbId,
+			@QueryParam("locationDbId") String locationDbId,
+			@QueryParam("seasonDbId") String seasonDbId,
+			@QueryParam("searchResultsDbId") String searchResultsDbId,
+			@QueryParam("observationTimeStampRangeStart") String observationTimeStampRangeStart,
+			@QueryParam("observationTimeStampRangeEnd") String observationTimeStampRangeEnd,
+			@QueryParam("programDbId") String programDbId,
+			@QueryParam("trialDbId") String trialDbId,
+			@QueryParam("studyDbId") String studyDbId,
+			@QueryParam("germplasmDbId") String germplasmDbId,
+			@QueryParam("observationUnitLevelName") String observationUnitLevelName,
+			@QueryParam("observationUnitLevelOrder") String observationUnitLevelOrder,
+			@QueryParam("observationUnitLevelCode") String observationUnitLevelCode,
+			@QueryParam("observationUnitLevelRelationshipName") String observationUnitLevelRelationshipName,
+			@QueryParam("observationUnitLevelRelationshipOrder") String observationUnitLevelRelationshipOrder,
+			@QueryParam("observationUnitLevelRelationshipCode") String observationUnitLevelRelationshipCode,
+			@QueryParam("observationUnitLevelRelationshipDbId") String observationUnitLevelRelationshipDbId)
+			throws IOException, SQLException
 	{
 		resp.sendError(Response.Status.BAD_REQUEST.getStatusCode());
 		return null;
@@ -281,7 +305,7 @@ public class ObservationServerResource extends ObservationBaseServerResource imp
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	public BaseResult<Observation> getObservationById(@PathParam("observationDbId") String observationDbId)
-		throws IOException, SQLException
+			throws IOException, SQLException
 	{
 		resp.sendError(Response.Status.NOT_IMPLEMENTED.getStatusCode());
 		return null;
@@ -293,7 +317,7 @@ public class ObservationServerResource extends ObservationBaseServerResource imp
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	public BaseResult<Observation> putObservationById(@PathParam("observationDbId") String observationDbId, Observation observation)
-		throws IOException, SQLException
+			throws IOException, SQLException
 	{
 		resp.sendError(Response.Status.NOT_IMPLEMENTED.getStatusCode());
 		return null;
