@@ -1,5 +1,7 @@
 package jhi.germinate.brapi.server.resource.genotyping.call;
 
+import jakarta.annotation.security.PermitAll;
+import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.*;
 import jhi.germinate.brapi.server.Brapi;
 import jhi.germinate.brapi.server.util.*;
@@ -11,22 +13,18 @@ import org.jooq.*;
 import org.jooq.impl.DSL;
 import uk.ac.hutton.ics.brapi.resource.base.*;
 import uk.ac.hutton.ics.brapi.resource.genotyping.call.*;
-import uk.ac.hutton.ics.brapi.resource.genotyping.variant.Genotype;
 import uk.ac.hutton.ics.brapi.server.genotyping.call.BrapiCallSetServerResource;
 
-import jakarta.annotation.security.PermitAll;
-import jakarta.ws.rs.*;
-
 import java.io.File;
-import java.io.IOException;
+import java.io.*;
 import java.sql.*;
 import java.util.*;
 import java.util.stream.*;
 
-import static jhi.germinate.server.database.codegen.tables.Datasetmembers.*;
-import static jhi.germinate.server.database.codegen.tables.Datasets.*;
-import static jhi.germinate.server.database.codegen.tables.Germinatebase.*;
-import static jhi.germinate.server.database.codegen.tables.Markers.*;
+import static jhi.germinate.server.database.codegen.tables.Datasetmembers.DATASETMEMBERS;
+import static jhi.germinate.server.database.codegen.tables.Datasets.DATASETS;
+import static jhi.germinate.server.database.codegen.tables.Germinatebase.GERMINATEBASE;
+import static jhi.germinate.server.database.codegen.tables.Markers.MARKERS;
 
 @Path("brapi/v2/callsets")
 @Secured
@@ -43,7 +41,7 @@ public class CallSetServerResource extends CallSetBaseServerResource implements 
 														@QueryParam("germplasmDbId") String germplasmDbId,
 														@QueryParam("externalReferenceId") String externalReferenceId,
 														@QueryParam("externalReferenceSource") String externalReferenceSource)
-		throws IOException, SQLException
+			throws IOException, SQLException
 	{
 		AuthenticationFilter.UserDetails userDetails = (AuthenticationFilter.UserDetails) securityContext.getUserPrincipal();
 		List<Integer> datasets = DatasetTableResource.getDatasetIdsForUser(req, userDetails, "genotype");
@@ -68,7 +66,7 @@ public class CallSetServerResource extends CallSetBaseServerResource implements 
 
 			long totalCount = context.fetchOne("SELECT FOUND_ROWS()").into(Long.class);
 			return new BaseResult<>(new ArrayResult<CallSet>()
-				.setData(callSets), page, pageSize, totalCount);
+											.setData(callSets), page, pageSize, totalCount);
 		}
 	}
 
@@ -77,7 +75,7 @@ public class CallSetServerResource extends CallSetBaseServerResource implements 
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	public BaseResult<CallSet> getCallSetById(@PathParam("callSetDbId") String callSetDbId)
-		throws IOException, SQLException
+			throws IOException, SQLException
 	{
 		try (Connection conn = Database.getConnection())
 		{
@@ -101,7 +99,7 @@ public class CallSetServerResource extends CallSetBaseServerResource implements 
 															@QueryParam("unknownString") String unknownString,
 															@QueryParam("sepPhased") String sepPhased,
 															@QueryParam("sepUnphased") String sepUnphased)
-		throws IOException, SQLException
+			throws IOException, SQLException
 	{
 		if (StringUtils.isEmpty(callSetDbId) || !callSetDbId.contains("-"))
 		{
@@ -148,27 +146,29 @@ public class CallSetServerResource extends CallSetBaseServerResource implements 
 			Hdf5DataExtractor extractor = new Hdf5DataExtractor(new File(Brapi.BRAPI.hdf5BaseFolder, dataset.getSourceFile()));
 			List<String> alleles = extractor.getAllelesForLine(germplasm.getName(), params);
 			List<String> markerNames = extractor.getMarkers();
-			Map<String, Integer> markerNamesToIds = context.selectFrom(MARKERS)
-														   .where(MARKERS.MARKER_NAME.in(markerNames))
-														   .fetchMap(MARKERS.MARKER_NAME, MARKERS.ID);
+			Map<String, Integer> markerNamesToIds = new HashMap<>();
+			context.selectFrom(MARKERS)
+				   .where(MARKERS.MARKER_NAME.in(markerNames))
+				   .stream()
+				   .forEach(r -> markerNamesToIds.put(r.get(MARKERS.MARKER_NAME), r.get(MARKERS.ID)));
 
 			List<Call> calls = IntStream.range(0, alleles.size())
 										.skip(pageSize * page)
 										.limit(pageSize)
 										.mapToObj(i -> new Call()
-											.setCallSetDbId(callSetDbId)
-											.setCallSetName(germplasm.getName())
-											.setGenotypeValue(alleles.get(i))
-											.setVariantDbId(dataset.getId() + "-" + markerNamesToIds.get(markerNames.get(i)))
-											.setVariantName(markerNames.get(i)))
+												.setCallSetDbId(callSetDbId)
+												.setCallSetName(germplasm.getName())
+												.setGenotypeValue(alleles.get(i))
+												.setVariantDbId(dataset.getId() + "-" + markerNamesToIds.get(markerNames.get(i)))
+												.setVariantName(markerNames.get(i)))
 										.collect(Collectors.toList());
 
 			CallResult<Call> callResult = new CallResult<Call>()
-				.setData(calls)
-				.setExpandHomozygotes(!params.isCollapse())
-				.setSepPhased(params.getSepPhased())
-				.setSepUnphased(params.getSepUnphased())
-				.setUnknownString(params.getUnknownString());
+					.setData(calls)
+					.setExpandHomozygotes(!params.isCollapse())
+					.setSepPhased(params.getSepPhased())
+					.setSepUnphased(params.getSepUnphased())
+					.setUnknownString(params.getUnknownString());
 			return new BaseResult<>(callResult, page, pageSize, alleles.size());
 		}
 	}
