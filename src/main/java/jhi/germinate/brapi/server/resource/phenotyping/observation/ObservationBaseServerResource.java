@@ -57,6 +57,7 @@ public class ObservationBaseServerResource extends BaseServerResource
 					observation.setStudyDbId(o.get(DATASETS.ID, String.class));
 					observation.setObservationVariableDbId(o.get(PHENOTYPES.ID, String.class));
 					observation.setObservationVariableName(o.get(PHENOTYPES.NAME));
+					observation.setValue(o.get(PHENOTYPEDATA.PHENOTYPE_VALUE));
 					Timestamp t = o.get(PHENOTYPEDATA.RECORDING_DATE);
 					if (t != null)
 						observation.setObservationTimeStamp(sdf.format(t));
