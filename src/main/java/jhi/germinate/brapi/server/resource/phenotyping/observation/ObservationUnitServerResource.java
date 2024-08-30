@@ -5,8 +5,8 @@ import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.*;
 import jhi.germinate.resource.enums.UserType;
 import jhi.germinate.server.*;
-import jhi.germinate.server.database.codegen.tables.pojos.Datasets;
-import jhi.germinate.server.database.codegen.tables.records.*;
+import jhi.germinate.server.database.codegen.tables.pojos.Trialsetup;
+import jhi.germinate.server.database.codegen.tables.records.TrialsetupRecord;
 import jhi.germinate.server.resource.datasets.DatasetTableResource;
 import jhi.germinate.server.util.*;
 import org.jooq.*;
@@ -16,11 +16,8 @@ import uk.ac.hutton.ics.brapi.server.phenotyping.observation.BrapiObservationUni
 
 import java.io.IOException;
 import java.sql.*;
-import java.text.SimpleDateFormat;
 import java.util.*;
 
-import static jhi.germinate.server.database.codegen.tables.Datasets.DATASETS;
-import static jhi.germinate.server.database.codegen.tables.Phenotypedata.PHENOTYPEDATA;
 import static jhi.germinate.server.database.codegen.tables.Trialsetup.TRIALSETUP;
 
 @Path("brapi/v2/observationunits")
@@ -60,36 +57,7 @@ public class ObservationUnitServerResource extends ObservationUnitBaseServerReso
 
 			if (!StringUtils.isEmpty(observationUnitDbId))
 			{
-				String[] parts = observationUnitDbId.split("-", -1);
-
-				if (parts.length == 5)
-				{
-					try
-					{
-						conditions.add(TRIALSETUP.GERMINATEBASE_ID.eq(Integer.parseInt(parts[0])));
-						conditions.add(TRIALSETUP.DATASET_ID.eq(Integer.parseInt(parts[1])));
-						conditions.add(TRIALSETUP.REP.isNotDistinctFrom(parts[2]));
-
-						try
-						{
-							conditions.add(TRIALSETUP.TRIAL_COLUMN.isNotDistinctFrom(Short.parseShort(parts[3])));
-						}
-						catch (Exception ex)
-						{
-						}
-						try
-						{
-							conditions.add(TRIALSETUP.TRIAL_ROW.isNotDistinctFrom(Short.parseShort(parts[4])));
-						}
-						catch (Exception ex)
-						{
-						}
-					}
-					catch (Exception e)
-					{
-						e.printStackTrace();
-					}
-				}
+				conditions.add(TRIALSETUP.ID.cast(String.class).eq(observationUnitDbId));
 			}
 			if (!StringUtils.isEmpty(germplasmDbId))
 			{
@@ -101,7 +69,8 @@ public class ObservationUnitServerResource extends ObservationUnitBaseServerReso
 				{
 				}
 			}
-			if (!StringUtils.isEmpty(studyDbId)) {
+			if (!StringUtils.isEmpty(studyDbId))
+			{
 				try
 				{
 					conditions.add(TRIALSETUP.DATASET_ID.eq(Integer.parseInt(studyDbId)));
@@ -111,7 +80,7 @@ public class ObservationUnitServerResource extends ObservationUnitBaseServerReso
 				}
 			}
 
-			boolean io = true;
+			boolean io = false;
 			if (!StringUtils.isEmpty(includeObservations))
 				io = Boolean.parseBoolean(includeObservations);
 
@@ -136,45 +105,59 @@ public class ObservationUnitServerResource extends ObservationUnitBaseServerReso
 		// Check that all requested study ids are valid and the user has permissions
 		AuthenticationFilter.UserDetails userDetails = (AuthenticationFilter.UserDetails) securityContext.getUserPrincipal();
 		List<Integer> datasetIds = DatasetTableResource.getDatasetIdsForUser(req, userDetails, "trials");
+		Set<Integer> studyDbId = new HashSet<>();
+
 		for (ObservationUnit ou : newObservationUnits)
 		{
-			if (!CollectionUtils.isEmpty(ou.getObservations()))
+			if (StringUtils.isEmpty(ou.getStudyDbId()))
 			{
-				for (Observation o : ou.getObservations())
-				{
-					try
-					{
-						Integer id = Integer.parseInt(o.getStudyDbId());
+				resp.sendError(Response.Status.BAD_REQUEST.getStatusCode());
+				return null;
+			}
 
-						if (!datasetIds.contains(id))
-						{
-							resp.sendError(Response.Status.FORBIDDEN.getStatusCode());
-							return null;
-						}
-					}
-					catch (NullPointerException | NumberFormatException e)
-					{
-						resp.sendError(Response.Status.BAD_REQUEST.getStatusCode());
-						return null;
-					}
+			try
+			{
+				Integer id = Integer.parseInt(ou.getStudyDbId());
+
+				if (!datasetIds.contains(id))
+				{
+					resp.sendError(Response.Status.FORBIDDEN.getStatusCode());
+					return null;
 				}
+				studyDbId.add(id);
+			}
+			catch (NullPointerException | NumberFormatException e)
+			{
+				resp.sendError(Response.Status.BAD_REQUEST.getStatusCode());
+				return null;
 			}
 		}
 
-		SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ");
-
-		List<Integer> newIds = new ArrayList<>();
+		datasetIds.retainAll(studyDbId);
 
 		try (Connection conn = Database.getConnection())
 		{
 			DSLContext context = Database.getContext(conn);
-			for (ObservationUnit n : newObservationUnits)
+
+			// Dataset id + Germplasm id + rep + row + column -> Trialsetup entry
+			Map<String, Trialsetup> trialSetupMapping = new HashMap<>();
+			for (Integer datasetId : datasetIds)
 			{
+				context.selectFrom(TRIALSETUP).where(TRIALSETUP.DATASET_ID.eq(datasetId))
+					   .forEach(ts -> trialSetupMapping.put(ts.getDatasetId() + "-" + ts.getGerminatebaseId() + "-" + ts.getRep() + "-" + ts.getTrialRow() + "-" + ts.getTrialColumn(), ts.into(Trialsetup.class)));
+			}
+
+			List<Integer> ids = new ArrayList<>();
+			// Now check if the observation units exist in the `trialsetup`
+			for (ObservationUnit ou : newObservationUnits)
+			{
+				String datasetId = ou.getStudyDbId();
+				String germinatebaseId = ou.getGermplasmDbId();
 				Short row = null;
 				Short col = null;
-				String rep = null;
+				String rep = "1";
 
-				ObservationUnitPosition pos = n.getObservationUnitPosition();
+				ObservationUnitPosition pos = ou.getObservationUnitPosition();
 
 				if (pos != null)
 				{
@@ -232,176 +215,207 @@ public class ObservationUnitServerResource extends ObservationUnitBaseServerReso
 					}
 				}
 
-				if (!CollectionUtils.isEmpty(n.getObservations()))
+				Trialsetup ts = trialSetupMapping.get(datasetId + "-" + germinatebaseId + "-" + rep + "-" + row + "-" + col);
+
+				if (ts == null)
 				{
-					for (Observation o : n.getObservations())
-					{
-						Datasets dataset = context.selectFrom(DATASETS).where(DATASETS.ID.cast(String.class).eq(o.getStudyDbId())).fetchAnyInto(Datasets.class);
+					TrialsetupRecord r = context.newRecord(TRIALSETUP);
+					r.setDatasetId(Integer.parseInt(datasetId));
+					r.setGerminatebaseId(Integer.parseInt(germinatebaseId));
+					r.setBlock("1");
+					r.setRep(rep == null ? "1" : rep);
+					r.setTrialRow(row);
+					r.setTrialColumn(col);
+					r.store();
 
-						if (dataset == null)
-							continue;
-
-						TrialsetupRecord ts = context.newRecord(TRIALSETUP);
-						ts.setGerminatebaseId(Integer.parseInt(o.getGermplasmDbId()));
-						ts.setTrialRow(row);
-						ts.setTrialColumn(col);
-						ts.setRep(rep);
-						ts.setDatasetId(dataset.getId());
-
-						if (o.getGeoCoordinates() != null)
-						{
-							if (o.getGeoCoordinates().getGeometry() != null)
-							{
-								if (o.getGeoCoordinates().getGeometry().getCoordinates() != null)
-								{
-									double[] coords = o.getGeoCoordinates().getGeometry().getCoordinates();
-
-									if (coords.length == 3)
-									{
-										ts.setLatitude(toBigDecimal(coords[0]));
-										ts.setLongitude(toBigDecimal(coords[1]));
-										ts.setElevation(toBigDecimal(coords[2]));
-									}
-								}
-							}
-						}
-
-						if (o.getAdditionalInfo() != null)
-						{
-							try
-							{
-								ts.setTrialRow(Short.parseShort(o.getAdditionalInfo().get("row")));
-							}
-							catch (Exception e)
-							{
-								// Ignore
-							}
-							try
-							{
-								ts.setTrialColumn(Short.parseShort(o.getAdditionalInfo().get("column")));
-							}
-							catch (Exception e)
-							{
-								// Ignore
-							}
-							try
-							{
-								ts.setRep(o.getAdditionalInfo().get("rep"));
-							}
-							catch (Exception e)
-							{
-								// Ignore
-							}
-						}
-
-						SelectConditionStep<TrialsetupRecord> step = context.selectFrom(TRIALSETUP)
-																			.where(TRIALSETUP.GERMINATEBASE_ID.eq(ts.getGerminatebaseId()))
-																			.and(TRIALSETUP.DATASET_ID.eq(ts.getDatasetId()))
-																			.and(TRIALSETUP.LATITUDE.isNotDistinctFrom(ts.getLatitude()))
-																			.and(TRIALSETUP.LONGITUDE.isNotDistinctFrom(ts.getLongitude()))
-																			.and(TRIALSETUP.ELEVATION.isNotDistinctFrom(ts.getElevation()))
-																			.and(TRIALSETUP.TRIAL_ROW.isNotDistinctFrom(ts.getTrialRow()))
-																			.and(TRIALSETUP.TRIAL_COLUMN.isNotDistinctFrom(ts.getTrialColumn()))
-																			.and(TRIALSETUP.REP.isNotDistinctFrom(ts.getRep()));
-
-						TrialsetupRecord temp = step.fetchAny();
-
-						if (temp != null)
-							ts = temp;
-						else
-							ts.store();
-
-
-						PhenotypedataRecord pd = context.newRecord(PHENOTYPEDATA);
-						pd.setTrialsetupId(ts.getId());
-						pd.setPhenotypeId(Integer.parseInt(o.getObservationVariableDbId()));
-						pd.setPhenotypeValue(o.getValue());
-						try
-						{
-							pd.setRecordingDate(new Timestamp(sdf.parse(o.getObservationTimeStamp()).getTime()));
-						}
-						catch (Exception e)
-						{
-							// Ignore
-						}
-
-						// Let's see if this comes from GridScore and we can get information about the trait type
-						boolean isMultiTrait = false;
-						if (o.getAdditionalInfo() != null)
-						{
-							try
-							{
-								isMultiTrait = Objects.equals(o.getAdditionalInfo().get("traitMType"), "multi");
-							}
-							catch (Exception e)
-							{
-								// Ignore...
-							}
-						}
-
-						if (isMultiTrait)
-						{
-							// Check if there's already an entry for the same plot, trait and timepoint and value
-							PhenotypedataRecord pdOld = context.select()
-															   .from(PHENOTYPEDATA)
-															   .leftJoin(TRIALSETUP).on(TRIALSETUP.ID.eq(PHENOTYPEDATA.TRIALSETUP_ID))
-															   .where(PHENOTYPEDATA.PHENOTYPE_ID.isNotDistinctFrom(pd.getPhenotypeId()))
-															   .and(TRIALSETUP.ID.eq(ts.getId()))
-															   .and(PHENOTYPEDATA.RECORDING_DATE.isNotDistinctFrom(pd.getRecordingDate()))
-															   .and(PHENOTYPEDATA.PHENOTYPE_VALUE.eq(pd.getPhenotypeValue()))
-															   .fetchAnyInto(PhenotypedataRecord.class);
-
-							if (pdOld == null)
-							{
-								pd.store();
-								newIds.add(pd.getId());
-							}
-							else
-							{
-								newIds.add(pdOld.getId());
-							}
-						}
-						else
-						{
-							// Otherwise, check if there's a match when ignoring the value. Single traits get their values updated if different
-							List<PhenotypedataRecord> matches = context.select()
-																	   .from(PHENOTYPEDATA)
-																	   .leftJoin(TRIALSETUP).on(TRIALSETUP.ID.eq(PHENOTYPEDATA.TRIALSETUP_ID))
-																	   .where(PHENOTYPEDATA.PHENOTYPE_ID.isNotDistinctFrom(pd.getPhenotypeId()))
-																	   .and(TRIALSETUP.ID.eq(ts.getId()))
-																	   .fetchInto(PhenotypedataRecord.class);
-
-							if (!CollectionUtils.isEmpty(matches))
-							{
-								// At this point, there should only be one match (because it's a single trait), but just in case, check them all
-								for (PhenotypedataRecord match : matches)
-								{
-									if (!Objects.equals(match.getPhenotypeValue(), pd.getPhenotypeValue()))
-									{
-										// If it doesn't match, the value has been updated on the client, do so here as well
-										match.setPhenotypeValue(pd.getPhenotypeValue());
-										match.setRecordingDate(pd.getRecordingDate());
-										match.store();
-									}
-
-									newIds.add(match.getId());
-								}
-							}
-							else
-							{
-								// Then store the new one
-								pd.store();
-								newIds.add(pd.getId());
-							}
-						}
-					}
+					trialSetupMapping.put(datasetId + "-" + germinatebaseId + "-" + rep + "-" + row + "-" + col, r.into(Trialsetup.class));
+					ids.add(r.getId());
+				}
+				else
+				{
+					ids.add(ts.getId());
 				}
 			}
 
 			page = 0;
 			pageSize = Integer.MAX_VALUE;
-			return getObservationUnitsBase(context, Collections.singletonList(PHENOTYPEDATA.ID.in(newIds)), true);
+			return getObservationUnitsBase(context, Collections.singletonList(TRIALSETUP.ID.in(ids)), false);
 		}
+
+
+
+//			SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ");
+//
+//				if (!CollectionUtils.isEmpty(n.getObservations()))
+//				{
+//					for (Observation o : n.getObservations())
+//					{
+//						Datasets dataset = context.selectFrom(DATASETS).where(DATASETS.ID.cast(String.class).eq(o.getStudyDbId())).fetchAnyInto(Datasets.class);
+//
+//						if (dataset == null)
+//							continue;
+//
+//						TrialsetupRecord ts = context.newRecord(TRIALSETUP);
+//						ts.setGerminatebaseId(Integer.parseInt(o.getGermplasmDbId()));
+//						ts.setTrialRow(row);
+//						ts.setTrialColumn(col);
+//						ts.setRep(rep);
+//						ts.setDatasetId(dataset.getId());
+//
+//						if (o.getGeoCoordinates() != null)
+//						{
+//							if (o.getGeoCoordinates().getGeometry() != null)
+//							{
+//								if (o.getGeoCoordinates().getGeometry().getCoordinates() != null)
+//								{
+//									double[] coords = o.getGeoCoordinates().getGeometry().getCoordinates();
+//
+//									if (coords.length == 3)
+//									{
+//										ts.setLatitude(toBigDecimal(coords[0]));
+//										ts.setLongitude(toBigDecimal(coords[1]));
+//										ts.setElevation(toBigDecimal(coords[2]));
+//									}
+//								}
+//							}
+//						}
+//
+//						if (o.getAdditionalInfo() != null)
+//						{
+//							try
+//							{
+//								ts.setTrialRow(Short.parseShort(o.getAdditionalInfo().get("row")));
+//							}
+//							catch (Exception e)
+//							{
+//								// Ignore
+//							}
+//							try
+//							{
+//								ts.setTrialColumn(Short.parseShort(o.getAdditionalInfo().get("column")));
+//							}
+//							catch (Exception e)
+//							{
+//								// Ignore
+//							}
+//							try
+//							{
+//								ts.setRep(o.getAdditionalInfo().get("rep"));
+//							}
+//							catch (Exception e)
+//							{
+//								// Ignore
+//							}
+//						}
+//
+//						SelectConditionStep<TrialsetupRecord> step = context.selectFrom(TRIALSETUP)
+//																			.where(TRIALSETUP.GERMINATEBASE_ID.eq(ts.getGerminatebaseId()))
+//																			.and(TRIALSETUP.DATASET_ID.eq(ts.getDatasetId()))
+//																			.and(TRIALSETUP.LATITUDE.isNotDistinctFrom(ts.getLatitude()))
+//																			.and(TRIALSETUP.LONGITUDE.isNotDistinctFrom(ts.getLongitude()))
+//																			.and(TRIALSETUP.ELEVATION.isNotDistinctFrom(ts.getElevation()))
+//																			.and(TRIALSETUP.TRIAL_ROW.isNotDistinctFrom(ts.getTrialRow()))
+//																			.and(TRIALSETUP.TRIAL_COLUMN.isNotDistinctFrom(ts.getTrialColumn()))
+//																			.and(TRIALSETUP.REP.isNotDistinctFrom(ts.getRep()));
+//
+//						TrialsetupRecord temp = step.fetchAny();
+//
+//						if (temp != null)
+//							ts = temp;
+//						else
+//							ts.store();
+//
+//
+//						PhenotypedataRecord pd = context.newRecord(PHENOTYPEDATA);
+//						pd.setTrialsetupId(ts.getId());
+//						pd.setPhenotypeId(Integer.parseInt(o.getObservationVariableDbId()));
+//						pd.setPhenotypeValue(o.getValue());
+//						try
+//						{
+//							pd.setRecordingDate(new Timestamp(sdf.parse(o.getObservationTimeStamp()).getTime()));
+//						}
+//						catch (Exception e)
+//						{
+//							// Ignore
+//						}
+//
+//						// Let's see if this comes from GridScore and we can get information about the trait type
+//						boolean isMultiTrait = false;
+//						if (o.getAdditionalInfo() != null)
+//						{
+//							try
+//							{
+//								isMultiTrait = Objects.equals(o.getAdditionalInfo().get("traitMType"), "multi");
+//							}
+//							catch (Exception e)
+//							{
+//								// Ignore...
+//							}
+//						}
+//
+//						if (isMultiTrait)
+//						{
+//							// Check if there's already an entry for the same plot, trait and timepoint and value
+//							PhenotypedataRecord pdOld = context.select()
+//															   .from(PHENOTYPEDATA)
+//															   .leftJoin(TRIALSETUP).on(TRIALSETUP.ID.eq(PHENOTYPEDATA.TRIALSETUP_ID))
+//															   .where(PHENOTYPEDATA.PHENOTYPE_ID.isNotDistinctFrom(pd.getPhenotypeId()))
+//															   .and(TRIALSETUP.ID.eq(ts.getId()))
+//															   .and(PHENOTYPEDATA.RECORDING_DATE.isNotDistinctFrom(pd.getRecordingDate()))
+//															   .and(PHENOTYPEDATA.PHENOTYPE_VALUE.eq(pd.getPhenotypeValue()))
+//															   .fetchAnyInto(PhenotypedataRecord.class);
+//
+//							if (pdOld == null)
+//							{
+//								pd.store();
+//								newIds.add(pd.getId());
+//							}
+//							else
+//							{
+//								newIds.add(pdOld.getId());
+//							}
+//						}
+//						else
+//						{
+//							// Otherwise, check if there's a match when ignoring the value. Single traits get their values updated if different
+//							List<PhenotypedataRecord> matches = context.select()
+//																	   .from(PHENOTYPEDATA)
+//																	   .leftJoin(TRIALSETUP).on(TRIALSETUP.ID.eq(PHENOTYPEDATA.TRIALSETUP_ID))
+//																	   .where(PHENOTYPEDATA.PHENOTYPE_ID.isNotDistinctFrom(pd.getPhenotypeId()))
+//																	   .and(TRIALSETUP.ID.eq(ts.getId()))
+//																	   .fetchInto(PhenotypedataRecord.class);
+//
+//							if (!CollectionUtils.isEmpty(matches))
+//							{
+//								// At this point, there should only be one match (because it's a single trait), but just in case, check them all
+//								for (PhenotypedataRecord match : matches)
+//								{
+//									if (!Objects.equals(match.getPhenotypeValue(), pd.getPhenotypeValue()))
+//									{
+//										// If it doesn't match, the value has been updated on the client, do so here as well
+//										match.setPhenotypeValue(pd.getPhenotypeValue());
+//										match.setRecordingDate(pd.getRecordingDate());
+//										match.store();
+//									}
+//
+//									newIds.add(match.getId());
+//								}
+//							}
+//							else
+//							{
+//								// Then store the new one
+//								pd.store();
+//								newIds.add(pd.getId());
+//							}
+//						}
+//					}
+//				}
+//			}
+//
+//			page = 0;
+//			pageSize = Integer.MAX_VALUE;
+//			return getObservationUnitsBase(context, Collections.singletonList(PHENOTYPEDATA.ID.in(newIds)), true);
+//		}
 	}
 
 	@PUT

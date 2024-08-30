@@ -30,6 +30,7 @@ public class ObservationUnitBaseServerResource extends BaseServerResource
 		List<Integer> datasetIds = DatasetTableResource.getDatasetIdsForUser(req, userDetails, "trials");
 
 		SelectConditionStep<?> step = context.select(
+													 TRIALSETUP.ID.as("observationUnitDbId"),
 													 GERMINATEBASE.ID.as("germplasmDbId"),
 													 GERMINATEBASE.NAME.as("germplasmName"),
 													 TRIALSETUP.TRIAL_ROW.as("trialRow"),
@@ -62,7 +63,7 @@ public class ObservationUnitBaseServerResource extends BaseServerResource
 				step.and(condition);
 		}
 
-		step.groupBy(TRIALSETUP.GERMINATEBASE_ID, TRIALSETUP.REP, TRIALSETUP.TRIAL_ROW, TRIALSETUP.TRIAL_COLUMN, TRIALSETUP.DATASET_ID);
+		step.groupBy(TRIALSETUP.ID);
 
 		SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ");
 
@@ -81,8 +82,7 @@ public class ObservationUnitBaseServerResource extends BaseServerResource
 					String col = d.getTrialColumn();
 					String row = d.getTrialRow();
 
-					String id = d.getGermplasmDbId() + "-" + d.getStudyDbId() + "-" + rep + "-" + col + "-" + row;
-					unit.setObservationUnitDbId(id);
+					unit.setObservationUnitDbId(d.getObservationUnitDbId());
 
 					if (!StringUtils.isEmpty(rep) || !StringUtils.isEmpty(col) || !StringUtils.isEmpty(row))
 					{
@@ -133,18 +133,22 @@ public class ObservationUnitBaseServerResource extends BaseServerResource
 
 							if (latitude != null && longitude != null)
 							{
-								double[] coordinates;
+								Double[] c;
 
 								if (elevation == null)
-									coordinates = new double[]{longitude, latitude};
+									c = new Double[]{longitude, latitude};
 								else
-									coordinates = new double[]{longitude, latitude, elevation};
+									c = new Double[]{longitude, latitude, elevation};
 
-								o.setGeoCoordinates(new CoordinatesPoint()
-															.setType("Feature")
-															.setGeometry(new GeometryPoint()
-																				 .setType("Point")
-																				 .setCoordinates(coordinates)));
+								GeometryPoint point = new GeometryPoint();
+								point.setCoordinates(c);
+								point.setType("Point");
+
+								CoordinatesPoint coordinates = new CoordinatesPoint();
+								coordinates.setType("Feature");
+								coordinates.setGeometry(point);
+
+								o.setGeoCoordinates(coordinates);
 							}
 
 							obvs.add(o);

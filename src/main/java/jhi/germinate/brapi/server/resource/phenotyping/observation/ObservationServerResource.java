@@ -3,19 +3,22 @@ package jhi.germinate.brapi.server.resource.phenotyping.observation;
 import jakarta.annotation.security.PermitAll;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.*;
-import jhi.germinate.server.Database;
-import jhi.germinate.server.database.codegen.tables.pojos.Datasets;
+import jhi.germinate.server.*;
 import jhi.germinate.server.database.codegen.tables.records.*;
+import jhi.germinate.server.resource.datasets.DatasetTableResource;
 import jhi.germinate.server.util.*;
 import org.jooq.*;
 import uk.ac.hutton.ics.brapi.resource.base.*;
+import uk.ac.hutton.ics.brapi.resource.core.location.*;
 import uk.ac.hutton.ics.brapi.resource.phenotyping.observation.Observation;
 import uk.ac.hutton.ics.brapi.server.phenotyping.observation.BrapiObservationServerResource;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.sql.*;
 import java.text.SimpleDateFormat;
 import java.util.*;
+import java.util.logging.Logger;
 
 import static jhi.germinate.server.database.codegen.tables.Datasets.DATASETS;
 import static jhi.germinate.server.database.codegen.tables.Germinatebase.GERMINATEBASE;
@@ -102,7 +105,12 @@ public class ObservationServerResource extends ObservationBaseServerResource imp
 
 		Set<Integer> traitIds = new HashSet<>();
 		Set<Integer> germplasmIds = new HashSet<>();
-		Integer studyDbId = null;
+		Set<Integer> observationUnitIds = new HashSet<>();
+		Set<Integer> studyDbIds = new HashSet<>();
+
+		// Check that all requested study ids are valid and the user has permissions
+		AuthenticationFilter.UserDetails userDetails = (AuthenticationFilter.UserDetails) securityContext.getUserPrincipal();
+		List<Integer> datasetIds = DatasetTableResource.getDatasetIdsForUser(req, userDetails, "trials");
 
 		for (Observation n : newObservations)
 		{
@@ -113,6 +121,18 @@ public class ObservationServerResource extends ObservationBaseServerResource imp
 			catch (Exception e)
 			{
 				// Observation variable not specified
+				Logger.getLogger("").warning("INVALID OBSERVATION VARIABLE DB ID: " + n.getObservationVariableDbId());
+				resp.sendError(Response.Status.BAD_REQUEST.getStatusCode());
+				return null;
+			}
+			try
+			{
+				observationUnitIds.add(Integer.parseInt(n.getObservationUnitDbId()));
+			}
+			catch (Exception e)
+			{
+				// Observation variable not specified
+				Logger.getLogger("").warning("INVALID OBSERVATION UNIT DB ID: " + n.getObservationUnitDbId());
 				resp.sendError(Response.Status.BAD_REQUEST.getStatusCode());
 				return null;
 			}
@@ -123,133 +143,205 @@ public class ObservationServerResource extends ObservationBaseServerResource imp
 			catch (Exception e)
 			{
 				// Germplasm not specified
+				Logger.getLogger("").warning("GERMPLASM DB ID: " + n.getGermplasmDbId());
 				resp.sendError(Response.Status.BAD_REQUEST.getStatusCode());
 				return null;
 			}
 			try
 			{
-				studyDbId = Integer.parseInt(n.getStudyDbId());
+				Integer id = Integer.parseInt(n.getStudyDbId());
+
+				if (!datasetIds.contains(id))
+				{
+					resp.sendError(Response.Status.FORBIDDEN.getStatusCode());
+					return null;
+				}
+				studyDbIds.add(id);
 			}
 			catch (Exception e)
 			{
 				// Study not specified
+				Logger.getLogger("").warning("INVALID STUDY DB ID: " + n.getStudyDbId());
 				resp.sendError(Response.Status.BAD_REQUEST.getStatusCode());
 				return null;
 			}
 		}
+
+		datasetIds.retainAll(studyDbIds);
 
 		SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ssZ");
 
 		try (Connection conn = Database.getConnection())
 		{
 			DSLContext context = Database.getContext(conn);
-			int traitCount = context.selectCount().from(PHENOTYPES).where(PHENOTYPES.ID.in(traitIds)).execute();
-			int germplasmCount = context.selectCount().from(GERMINATEBASE).where(GERMINATEBASE.ID.in(germplasmIds)).execute();
+			Integer traitCount = context.selectCount().from(PHENOTYPES).where(PHENOTYPES.ID.in(traitIds)).fetchAnyInto(Integer.class);
+			Integer germplasmCount = context.selectCount().from(GERMINATEBASE).where(GERMINATEBASE.ID.in(germplasmIds)).fetchAnyInto(Integer.class);
+			Integer observationUnitCount = context.selectCount().from(TRIALSETUP).where(TRIALSETUP.ID.in(observationUnitIds)).fetchAnyInto(Integer.class);
 
-			if (traitIds.size() != traitCount || germplasmIds.size() != germplasmCount)
+			if (traitIds.size() != traitCount || germplasmIds.size() != germplasmCount || observationUnitIds.size() != observationUnitCount)
 			{
 				// Specified trait or germplasm not found
+				Logger.getLogger("").warning("INVALID REQUEST PARAMETERS: traits: " + traitIds.size() + ", " + traitCount + ", germplasm: " + germplasmIds.size() + ", " + germplasmCount + ", observationUnits: " + observationUnitIds.size() + ", " + observationUnitCount);
+				Logger.getLogger("").warning("TRAITS: " + traitIds);
+				Logger.getLogger("").warning("GERMPLASM: " + germplasmIds);
+				Logger.getLogger("").warning("OBSERVATION UNITS: " + observationUnitIds);
 				resp.sendError(Response.Status.BAD_REQUEST.getStatusCode());
 				return null;
 			}
 
-			Datasets dataset = context.selectFrom(DATASETS).where(DATASETS.ID.eq(studyDbId)).fetchAnyInto(Datasets.class);
+			Map<String, TrialsetupRecord> observationUnits = new HashMap<>();
+			context.selectFrom(TRIALSETUP).where(TRIALSETUP.ID.in(observationUnitIds)).forEach(ou -> observationUnits.put(Integer.toString(ou.getId()), ou));
 
-			if (dataset == null)
-			{
-				// Dataset not found
-				resp.sendError(Response.Status.BAD_REQUEST.getStatusCode());
-				return null;
-			}
+			Map<String, PhenotypedataRecord> multiMapping = new HashMap<>();
+			Map<String, PhenotypedataRecord> singleMapping = new HashMap<>();
+			context.selectFrom(PHENOTYPEDATA)
+				   .where(PHENOTYPEDATA.PHENOTYPE_ID.in(traitIds))
+				   .and(PHENOTYPEDATA.TRIALSETUP_ID.in(observationUnitIds))
+				   .forEach(pd -> {
+					   String multiKey = pd.getPhenotypeId() + "|" + pd.getTrialsetupId() + "|" + pd.getRecordingDate() + "|" + pd.getPhenotypeValue();
+					   String singleKey = pd.getPhenotypeId() + "|" + pd.getTrialsetupId();
+
+					   multiMapping.put(multiKey, pd);
+					   singleMapping.put(singleKey, pd);
+				   });
+
 
 			List<Integer> newIds = new ArrayList<>();
 
-			for (Observation n : newObservations)
+			for (Observation o : newObservations)
 			{
-				TrialsetupRecord ts = context.newRecord(TRIALSETUP);
-				ts.setGerminatebaseId(Integer.parseInt(n.getGermplasmDbId()));
-				ts.setDatasetId(dataset.getId());
-
-				if (n.getGeoCoordinates() != null)
-				{
-					if (n.getGeoCoordinates().getGeometry() != null)
-					{
-						if (n.getGeoCoordinates().getGeometry().getCoordinates() != null)
-						{
-							double[] coords = n.getGeoCoordinates().getGeometry().getCoordinates();
-
-							if (coords.length == 3)
-							{
-								ts.setLatitude(toBigDecimal(coords[0]));
-								ts.setLongitude(toBigDecimal(coords[1]));
-								ts.setElevation(toBigDecimal(coords[2]));
-							}
-						}
-					}
-				}
-
-				if (n.getAdditionalInfo() != null)
-				{
-					try
-					{
-						ts.setTrialRow(Short.parseShort(n.getAdditionalInfo().get("row")));
-					}
-					catch (Exception e)
-					{
-						// Ignore
-					}
-					try
-					{
-						ts.setTrialColumn(Short.parseShort(n.getAdditionalInfo().get("column")));
-					}
-					catch (Exception e)
-					{
-						// Ignore
-					}
-					try
-					{
-						ts.setRep(n.getAdditionalInfo().get("rep"));
-					}
-					catch (Exception e)
-					{
-						// Ignore
-					}
-				}
-
-				SelectConditionStep<TrialsetupRecord> step = context.selectFrom(TRIALSETUP)
-																	.where(TRIALSETUP.GERMINATEBASE_ID.eq(ts.getGerminatebaseId()))
-																	.and(TRIALSETUP.DATASET_ID.eq(ts.getDatasetId()))
-																	.and(TRIALSETUP.LATITUDE.isNotDistinctFrom(ts.getLatitude()))
-																	.and(TRIALSETUP.LONGITUDE.isNotDistinctFrom(ts.getLongitude()))
-																	.and(TRIALSETUP.ELEVATION.isNotDistinctFrom(ts.getElevation()))
-																	.and(TRIALSETUP.TRIAL_ROW.isNotDistinctFrom(ts.getTrialRow()))
-																	.and(TRIALSETUP.TRIAL_COLUMN.isNotDistinctFrom(ts.getTrialColumn()))
-																	.and(TRIALSETUP.REP.isNotDistinctFrom(ts.getRep()));
-
-				TrialsetupRecord temp = step.fetchAny();
-
-				if (temp != null)
-					ts = temp;
-				else
-					ts.store();
-
+				TrialsetupRecord observationUnit = observationUnits.get(o.getObservationUnitDbId());
 				PhenotypedataRecord pd = context.newRecord(PHENOTYPEDATA);
-				pd.setTrialsetupId(ts.getId());
-				pd.setPhenotypeId(Integer.parseInt(n.getObservationVariableDbId()));
-				pd.setPhenotypeValue(n.getValue());
+				pd.setTrialsetupId(Integer.parseInt(o.getObservationUnitDbId()));
+				pd.setPhenotypeId(Integer.parseInt(o.getObservationVariableDbId()));
+				pd.setPhenotypeValue(o.getValue());
 				try
 				{
-					pd.setRecordingDate(new Timestamp(sdf.parse(n.getObservationTimeStamp()).getTime()));
+					pd.setRecordingDate(new Timestamp(sdf.parse(o.getObservationTimeStamp()).getTime()));
 				}
 				catch (Exception e)
 				{
 					// Ignore
 				}
-				pd.store();
 
-				newIds.add(pd.getId());
-				// Update the id
-				n.setObservationDbId(Integer.toString(pd.getId()));
+				// Check if geo coordinates are available
+				if (o.getGeoCoordinates() != null && o.getGeoCoordinates().getGeometry() != null)
+				{
+					String type = o.getGeoCoordinates().getGeometry().getType();
+
+					if (Objects.equals(type, "Point"))
+					{
+						GeometryPoint p = (GeometryPoint) o.getGeoCoordinates().getGeometry().getCoordinates();
+						Double[] coords = p.getCoordinates();
+
+						if (coords.length >= 2) {
+							observationUnit.setLongitude(BigDecimal.valueOf(coords[0]));
+							observationUnit.setLatitude(BigDecimal.valueOf(coords[1]));
+
+							if (coords.length > 2) {
+								observationUnit.setElevation(BigDecimal.valueOf(coords[2]));
+							}
+
+							observationUnit.store(TRIALSETUP.LATITUDE, TRIALSETUP.LONGITUDE, TRIALSETUP.ELEVATION);
+						}
+					}
+					else if (Objects.equals(type, "Polygon"))
+					{
+						GeometryPolygon p = (GeometryPolygon) o.getGeoCoordinates().getGeometry().getCoordinates();
+						Double[][][] coords = p.getCoordinates();
+
+						if (coords.length > 0 && coords[0].length > 0 && coords[0][0].length == 5)
+						{
+							double lat = 0;
+							double lng = 0;
+							double elv = 0;
+							int count = 0;
+							int elvCount = 0;
+
+							for (Double[] d : coords[0])
+							{
+								if (d.length >= 2)
+								{
+									count++;
+									lng += d[0];
+									lat += d[1];
+									if (d.length > 2)
+									{
+										elv += d[2];
+										elvCount++;
+									}
+								}
+							}
+
+							if (count > 0)
+							{
+								observationUnit.setLatitude(BigDecimal.valueOf(lat / count));
+								observationUnit.setLongitude(BigDecimal.valueOf(lng / count));
+
+								if (elvCount > 0)
+								{
+									elv /= elvCount;
+									observationUnit.setElevation(BigDecimal.valueOf(elv));
+								}
+
+								observationUnit.store(TRIALSETUP.LATITUDE, TRIALSETUP.LONGITUDE, TRIALSETUP.ELEVATION);
+							}
+						}
+					}
+				}
+
+				// Let's see if this comes from GridScore and we can get information about the trait type
+				boolean isMultiTrait = true;
+				if (o.getAdditionalInfo() != null)
+				{
+					try
+					{
+						isMultiTrait = !Objects.equals(o.getAdditionalInfo().get("traitMType"), "single");
+					}
+					catch (Exception e)
+					{
+						// Ignore...
+					}
+				}
+
+				if (isMultiTrait)
+				{
+					// Check if there's already an entry for the same plot, trait and timepoint and value
+					PhenotypedataRecord pdOld = multiMapping.get(pd.getPhenotypeId() + "|" + pd.getTrialsetupId() + "|" + pd.getRecordingDate() + "|" + pd.getPhenotypeValue());
+
+					if (pdOld == null)
+					{
+						pd.store();
+						newIds.add(pd.getId());
+					}
+					else
+					{
+						newIds.add(pdOld.getId());
+					}
+				}
+				else
+				{
+					// Otherwise, check if there's a match when ignoring the value. Single traits get their values updated if different
+					PhenotypedataRecord match = singleMapping.get(pd.getPhenotypeId() + "|" + pd.getTrialsetupId());
+					if (match != null)
+					{
+						if (!Objects.equals(match.getPhenotypeValue(), pd.getPhenotypeValue()))
+						{
+							// If it doesn't match, the value has been updated on the client, do so here as well
+							match.setPhenotypeValue(pd.getPhenotypeValue());
+							match.setRecordingDate(pd.getRecordingDate());
+							match.store();
+						}
+
+						newIds.add(match.getId());
+					}
+					else
+					{
+						// Then store the new one
+						pd.store();
+						newIds.add(pd.getId());
+					}
+				}
 			}
 
 			page = 0;

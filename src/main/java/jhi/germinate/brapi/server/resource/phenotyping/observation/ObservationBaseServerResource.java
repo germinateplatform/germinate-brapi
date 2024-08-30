@@ -55,6 +55,7 @@ public class ObservationBaseServerResource extends BaseServerResource
 					observation.setGermplasmName(o.get(GERMINATEBASE.NAME));
 					observation.setObservationDbId(o.get(PHENOTYPEDATA.ID, String.class));
 					observation.setStudyDbId(o.get(DATASETS.ID, String.class));
+					observation.setObservationUnitDbId(o.get(PHENOTYPEDATA.TRIALSETUP_ID, String.class));
 					observation.setObservationVariableDbId(o.get(PHENOTYPES.ID, String.class));
 					observation.setObservationVariableName(o.get(PHENOTYPES.NAME));
 					observation.setValue(o.get(PHENOTYPEDATA.PHENOTYPE_VALUE));
@@ -67,18 +68,22 @@ public class ObservationBaseServerResource extends BaseServerResource
 
 					if (latitude != null && longitude != null)
 					{
-						double[] coordinates;
+						Double[] c;
 
 						if (elevation == null)
-							coordinates = new double[]{longitude.doubleValue(), latitude.doubleValue()};
+							c = new Double[]{longitude.doubleValue(), latitude.doubleValue()};
 						else
-							coordinates = new double[]{longitude.doubleValue(), latitude.doubleValue(), elevation.doubleValue()};
+							c = new Double[]{longitude.doubleValue(), latitude.doubleValue(), elevation.doubleValue()};
 
-						observation.setGeoCoordinates(new CoordinatesPoint()
-															  .setType("Feature")
-															  .setGeometry(new GeometryPoint()
-																				   .setType("Point")
-																				   .setCoordinates(coordinates)));
+						GeometryPoint point = new GeometryPoint();
+						point.setCoordinates(c);
+						point.setType("Point");
+
+						CoordinatesPoint coordinates = new CoordinatesPoint();
+						coordinates.setType("Feature");
+						coordinates.setGeometry(point);
+
+						observation.setGeoCoordinates(coordinates);
 					}
 
 					return observation;

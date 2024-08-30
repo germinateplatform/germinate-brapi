@@ -401,20 +401,24 @@ public abstract class GermplasmBaseServerResource extends BaseServerResource
 
 				if (lat != null && lng != null)
 				{
-					double[] coordinates;
+					Double[] c;
 
 					if (elv != null)
-						coordinates = new double[]{lng.doubleValue(), lat.doubleValue(), elv.doubleValue()};
+						c = new Double[]{lng.doubleValue(), lat.doubleValue(), elv.doubleValue()};
 					else
-						coordinates = new double[]{lng.doubleValue(), lat.doubleValue()};
+						c = new Double[]{lng.doubleValue(), lat.doubleValue()};
+
+					GeometryPoint point = new GeometryPoint();
+					point.setCoordinates(c);
+					point.setType("Point");
+
+					CoordinatesPoint coordinates = new CoordinatesPoint();
+					coordinates.setType("Feature");
+					coordinates.setGeometry(point);
 
 					g.setGermplasmOrigin(Collections.singletonList(new Origin()
 						.setCoordinateUncertainty(location.getLocationCoordinateUncertainty() != null ? Integer.toString(location.getLocationCoordinateUncertainty()) : null)
-						.setCoordinates(new CoordinatesPoint()
-							.setType("Feature")
-							.setGeometry(new GeometryPoint()
-								.setType("Point")
-								.setCoordinates(coordinates)))));
+						.setCoordinates(coordinates)));
 				}
 			}
 
