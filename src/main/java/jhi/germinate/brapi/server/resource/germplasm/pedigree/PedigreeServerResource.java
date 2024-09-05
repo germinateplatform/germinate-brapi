@@ -71,16 +71,18 @@ public class PedigreeServerResource extends BaseServerResource implements BrapiP
 			context.select(
 					   GERMINATEBASE.ID.as("germplasmDbId"),
 					   GERMINATEBASE.NAME.as("germplasmName"),
+					   GERMINATEBASE.DISPLAY_NAME.as("germplasmDisplayName"),
 					   MCPD.PUID.as("germplasmPUI"))
 				   .from(GERMINATEBASE)
 				   .leftJoin(MCPD).on(MCPD.GERMINATEBASE_ID.eq(GERMINATEBASE.ID))
 				   .forEach(r -> lookup.put(r.get("germplasmName", String.class), new Pedigree().setGermplasmDbId(r.get("germplasmDbId", String.class))
-																								.setGermplasmName(r.get("germplasmName", String.class))
+																								.setGermplasmName(r.get("germplasmDisplayName", String.class))
 																								.setGermplasmPUI(r.get("germplasmPUI", String.class))));
 
 			SelectJoinStep<?> step = context.select(
 												GERMINATEBASE.ID.as("germplasmDbId"),
 												GERMINATEBASE.NAME.as("germplasmName"),
+												GERMINATEBASE.DISPLAY_NAME.as("defaultDisplayName"),
 												MCPD.PUID.as("germplasmPUI")
 											)
 											.hint("SQL_CALC_FOUND_ROWS")
@@ -94,7 +96,7 @@ public class PedigreeServerResource extends BaseServerResource implements BrapiP
 			if (!StringUtils.isEmpty(germplasmDbId))
 				step.where(GERMINATEBASE.ID.cast(String.class).eq(germplasmDbId));
 			if (!StringUtils.isEmpty(germplasmName))
-				step.where(GERMINATEBASE.NAME.eq(germplasmName));
+				step.where(GERMINATEBASE.DISPLAY_NAME.eq(germplasmName));
 			if (!StringUtils.isEmpty(commonCropName))
 				step.where(TAXONOMIES.CROPNAME.eq(commonCropName));
 			if (!StringUtils.isEmpty(accessionNumber))

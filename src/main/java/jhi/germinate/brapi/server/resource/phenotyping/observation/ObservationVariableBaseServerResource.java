@@ -54,7 +54,7 @@ public class ObservationVariableBaseServerResource extends BaseServerResource
                             scale.setDataType("Date");
                             break;
                         case numeric:
-                            scale.setDataType("Numeric");
+                            scale.setDataType("Numerical");
                             break;
                         case categorical:
                             scale.setDataType("Ordinal");

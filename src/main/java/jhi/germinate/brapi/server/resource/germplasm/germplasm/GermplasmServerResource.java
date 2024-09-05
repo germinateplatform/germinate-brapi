@@ -73,7 +73,7 @@ public class GermplasmServerResource extends GermplasmBaseServerResource impleme
 			if (!StringUtils.isEmpty(germplasmDbId))
 				conditions.add(GERMINATEBASE.ID.cast(String.class).eq(germplasmDbId));
 			if (!StringUtils.isEmpty(germplasmName))
-				conditions.add(GERMINATEBASE.NAME.eq(germplasmName));
+				conditions.add(GERMINATEBASE.DISPLAY_NAME.eq(germplasmName));
 			if (!StringUtils.isEmpty(commonCropName))
 				conditions.add(TAXONOMIES.CROPNAME.eq(commonCropName));
 			if (!StringUtils.isEmpty(accessionNumber))
@@ -232,6 +232,7 @@ public class GermplasmServerResource extends GermplasmBaseServerResource impleme
 
 			if (result != null)
 			{
+				String displayName = context.selectFrom(GERMINATEBASE).where(GERMINATEBASE.ID.cast(String.class).eq(result.getGermplasmDbId())).fetchAnyInto(String.class);
 				Synonyms synonyms = context.selectFrom(SYNONYMS)
 										   .where(SYNONYMS.SYNONYMTYPE_ID.eq(1))
 										   .and(SYNONYMS.FOREIGN_ID.cast(String.class).eq(result.getGermplasmDbId()))
@@ -277,12 +278,17 @@ public class GermplasmServerResource extends GermplasmBaseServerResource impleme
 							   storage.addAll(Arrays.asList(st.split(";")));
 					   });
 
+				List<String> names = new ArrayList<>();
+				names.add(displayName);
+
 				if (synonyms != null && synonyms.getSynonyms() != null)
 				{
 					List<String> mapped = Arrays.stream(synonyms.getSynonyms()).collect(Collectors.toList());
 					result.setAlternateIDs(mapped);
-					result.setAccessionNames(mapped);
+					names.addAll(mapped);
 				}
+
+				result.setAccessionNames(names);
 
 				List<Institutions> breedingInst = institutions.get(GermplasminstitutionsType.breeding);
 				if (!CollectionUtils.isEmpty(breedingInst))

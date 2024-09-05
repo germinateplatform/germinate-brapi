@@ -41,7 +41,7 @@ public class SearchAttributeValueServerResource extends AttributeValueBaseServer
 			if (!CollectionUtils.isEmpty(search.getGermplasmDbIds()))
 				conditions.add(VIEW_TABLE_GERMPLASM_ATTRIBUTES.GERMPLASM_ID.cast(String.class).in(search.getGermplasmDbIds()));
 			if (!CollectionUtils.isEmpty(search.getGermplasmNames()))
-				conditions.add(VIEW_TABLE_GERMPLASM_ATTRIBUTES.GERMPLASM_NAME.in(search.getGermplasmNames()));
+				conditions.add(VIEW_TABLE_GERMPLASM_ATTRIBUTES.GERMPLASM_DISPLAY_NAME.in(search.getGermplasmNames()));
 			if (!CollectionUtils.isEmpty(search.getDataTypes()))
 				conditions.add(VIEW_TABLE_GERMPLASM_ATTRIBUTES.ATTRIBUTE_TYPE.in(search.getDataTypes()));
 

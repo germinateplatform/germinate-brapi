@@ -192,6 +192,10 @@ public abstract class GermplasmBaseServerResource extends BaseServerResource
 		}
 
 		existing.setName(newGermplasm.getAccessionNumber());
+		if (!StringUtils.isEmpty(newGermplasm.getGermplasmName()))
+			existing.setDisplayName(newGermplasm.getGermplasmName());
+		else
+			existing.setDisplayName(newGermplasm.getAccessionNumber());
 		existing.setGeneralIdentifier(newGermplasm.getAccessionNumber());
 		mcpd.setAcqdate(newGermplasm.getAcquisitionDate());
 		if (!StringUtils.isEmpty(newGermplasm.getBiologicalStatusOfAccessionCode()))
@@ -287,10 +291,10 @@ public abstract class GermplasmBaseServerResource extends BaseServerResource
 											BIOLOGICALSTATUS.SAMPSTAT.as("biologicalStatusOfAccessionDescription"),
 											TAXONOMIES.CROPNAME.as("commonCropName"),
 											COUNTRIES.COUNTRY_CODE3.as("countryOfOriginCode"),
-											GERMINATEBASE.NAME.as("defaultDisplayName"),
+											GERMINATEBASE.DISPLAY_NAME.as("defaultDisplayName"),
 											TAXONOMIES.GENUS.as("genus"),
 											GERMINATEBASE.ID.as("germplasmDbId"),
-											GERMINATEBASE.NAME.as("germplasmName"),
+											GERMINATEBASE.DISPLAY_NAME.as("germplasmName"),
 											MCPD.PUID.as("germplasmPUI"),
 											PEDIGREEDEFINITIONS.DEFINITION.as("pedigree"),
 											TAXONOMIES.SPECIES.as("species"),

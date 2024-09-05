@@ -43,7 +43,7 @@ public class SearchGermplasmServerResource extends GermplasmBaseServerResource i
 			if (!CollectionUtils.isEmpty(search.getGermplasmDbIds()))
 				conditions.add(GERMINATEBASE.ID.cast(String.class).in(search.getGermplasmDbIds()));
 			if (!CollectionUtils.isEmpty(search.getGermplasmNames()))
-				conditions.add(GERMINATEBASE.NAME.in(search.getGermplasmNames()));
+				conditions.add(GERMINATEBASE.DISPLAY_NAME.in(search.getGermplasmNames()));
 			if (!CollectionUtils.isEmpty(search.getCommonCropNames()))
 				conditions.add(TAXONOMIES.CROPNAME.in(search.getCommonCropNames()));
 			if (!CollectionUtils.isEmpty(search.getAccessionNumbers()))
