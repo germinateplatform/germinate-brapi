@@ -3,6 +3,7 @@ package jhi.germinate.brapi.server.resource.core.location;
 import jhi.germinate.server.database.codegen.tables.pojos.ViewTableLocations;
 import jhi.germinate.server.util.StringUtils;
 import org.jooq.*;
+import org.jooq.Record;
 import uk.ac.hutton.ics.brapi.resource.core.location.*;
 import uk.ac.hutton.ics.brapi.server.base.BaseServerResource;
 

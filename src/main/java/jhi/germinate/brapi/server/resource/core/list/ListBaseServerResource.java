@@ -7,6 +7,7 @@ import java.util.stream.Collectors;
 
 import jhi.germinate.server.database.codegen.tables.pojos.ViewTableGroups;
 import jhi.germinate.server.util.StringUtils;
+import org.jooq.Record;
 import uk.ac.hutton.ics.brapi.resource.core.list.Lists;
 import uk.ac.hutton.ics.brapi.server.base.BaseServerResource;
 

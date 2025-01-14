@@ -9,6 +9,7 @@ import jhi.germinate.server.database.codegen.tables.pojos.ViewTablePedigrees;
 import jhi.germinate.server.resource.datasets.DatasetTableResource;
 import jhi.germinate.server.util.*;
 import org.jooq.*;
+import org.jooq.Record;
 import org.jooq.impl.DSL;
 import uk.ac.hutton.ics.brapi.resource.base.*;
 import uk.ac.hutton.ics.brapi.resource.germplasm.pedigree.Pedigree;

@@ -22,6 +22,7 @@ import java.sql.*;
 import java.util.*;
 
 import static jhi.germinate.server.database.codegen.tables.Datasets.*;
+import static jhi.germinate.server.database.codegen.tables.Phenotypecategories.PHENOTYPECATEGORIES;
 import static jhi.germinate.server.database.codegen.tables.Phenotypedata.*;
 import static jhi.germinate.server.database.codegen.tables.Phenotypes.*;
 import static jhi.germinate.server.database.codegen.tables.Trialsetup.TRIALSETUP;
@@ -36,7 +37,7 @@ public class ObservationVariableServerResource extends ObservationVariableBaseSe
 	@Produces(MediaType.APPLICATION_JSON)
 	@Secured(UserType.DATA_CURATOR)
 	public BaseResult<ArrayResult<ObservationVariable>> postObservationVariables(List<ObservationVariable> newVariables)
-		throws IOException, SQLException
+			throws IOException, SQLException
 	{
 		// If there are no new variables, or any of them don't have a trait or any of them have a scale without name or data type, return BAD_REQUEST
 		if (CollectionUtils.isEmpty(newVariables) || newVariables.stream().anyMatch(ov -> StringUtils.isEmpty(ov.getObservationVariableName()) || (ov.getScale() != null && (StringUtils.isEmpty(ov.getScale().getDataType())))))
@@ -76,9 +77,13 @@ public class ObservationVariableServerResource extends ObservationVariableBaseSe
 				UnitsRecord unit = ov.getScale() != null ? context.selectFrom(UNITS)
 																  .where(UNITS.UNIT_NAME.eq(ov.getScale().getScaleName()))
 																  .fetchAny() : null;
+				PhenotypecategoriesRecord category = StringUtils.isEmpty(ov.getTrait().getTraitClass()) ? null : context.selectFrom(PHENOTYPECATEGORIES)
+																														.where(PHENOTYPECATEGORIES.NAME.eq(ov.getTrait().getTraitClass()))
+																														.fetchAny();
 				PhenotypesRecord trait = context.selectFrom(PHENOTYPES)
 												.where(PHENOTYPES.NAME.eq(ov.getObservationVariableName()))
 												.and(PHENOTYPES.UNIT_ID.isNotDistinctFrom(unit == null ? null : unit.getId()))
+												.and(PHENOTYPES.CATEGORY_ID.isNotDistinctFrom(category == null ? null : category.getId()))
 												.and(PHENOTYPES.DATATYPE.eq(dataType))
 												.fetchAny();
 
@@ -87,6 +92,12 @@ public class ObservationVariableServerResource extends ObservationVariableBaseSe
 					unit = context.newRecord(UNITS);
 					unit.setUnitName(ov.getScale().getScaleName());
 					unit.store();
+				}
+
+				if (!StringUtils.isEmpty(ov.getTrait().getTraitClass()) && category == null) {
+					category = context.newRecord(PHENOTYPECATEGORIES);
+					category.setName(ov.getTrait().getTraitClass());
+					category.store();
 				}
 
 				if (trait == null)
@@ -132,6 +143,8 @@ public class ObservationVariableServerResource extends ObservationVariableBaseSe
 
 					if (unit != null)
 						trait.setUnitId(unit.getId());
+					if (category != null)
+						trait.setCategoryId(category.getId());
 
 					trait.store();
 				}
@@ -150,27 +163,27 @@ public class ObservationVariableServerResource extends ObservationVariableBaseSe
 	@Secured
 	@PermitAll
 	public BaseResult<ArrayResult<ObservationVariable>> getObservationVariables(
-		@QueryParam("observationVariableDbId") String observationVariableDbId,
-		@QueryParam("observationVariableName") String observationVariableName,
-		@QueryParam("observationVariablePUI") String observationVariablePUI,
-		@QueryParam("traitClass") String traitClass,
-		@QueryParam("methodDbId") String methodDbId,
-		@QueryParam("methodName") String methodName,
-		@QueryParam("methodPUI") String methodPUI,
-		@QueryParam("scaleDbId") String scaleDbId,
-		@QueryParam("scaleName") String scaleName,
-		@QueryParam("scalePUI") String scalePUI,
-		@QueryParam("traitDbId") String traitDbId,
-		@QueryParam("traitName") String traitName,
-		@QueryParam("traitPUI") String traitPUI,
-		@QueryParam("ontologyDbId") String ontologyDbId,
-		@QueryParam("commonCropName") String commonCropName,
-		@QueryParam("programDbId") String programDbId,
-		@QueryParam("trialDbId") String trialDbId,
-		@QueryParam("studyDbId") String studyDbId,
-		@QueryParam("externalReferenceId") String externalReferenceId,
-		@QueryParam("externalReferenceSource") String externalReferenceSource)
-		throws IOException, SQLException
+			@QueryParam("observationVariableDbId") String observationVariableDbId,
+			@QueryParam("observationVariableName") String observationVariableName,
+			@QueryParam("observationVariablePUI") String observationVariablePUI,
+			@QueryParam("traitClass") String traitClass,
+			@QueryParam("methodDbId") String methodDbId,
+			@QueryParam("methodName") String methodName,
+			@QueryParam("methodPUI") String methodPUI,
+			@QueryParam("scaleDbId") String scaleDbId,
+			@QueryParam("scaleName") String scaleName,
+			@QueryParam("scalePUI") String scalePUI,
+			@QueryParam("traitDbId") String traitDbId,
+			@QueryParam("traitName") String traitName,
+			@QueryParam("traitPUI") String traitPUI,
+			@QueryParam("ontologyDbId") String ontologyDbId,
+			@QueryParam("commonCropName") String commonCropName,
+			@QueryParam("programDbId") String programDbId,
+			@QueryParam("trialDbId") String trialDbId,
+			@QueryParam("studyDbId") String studyDbId,
+			@QueryParam("externalReferenceId") String externalReferenceId,
+			@QueryParam("externalReferenceSource") String externalReferenceSource)
+			throws IOException, SQLException
 	{
 		AuthenticationFilter.UserDetails userDetails = (AuthenticationFilter.UserDetails) securityContext.getUserPrincipal();
 		List<Integer> datasetIds = DatasetTableResource.getDatasetIdsForUser(req, userDetails, "trials");
@@ -236,7 +249,7 @@ public class ObservationVariableServerResource extends ObservationVariableBaseSe
 	@Secured
 	@PermitAll
 	public BaseResult<ObservationVariable> getObservationVariableById(@PathParam("observationVariableDbId") String observationVariableDbId)
-		throws IOException, SQLException
+			throws IOException, SQLException
 	{
 		resp.sendError(Response.Status.NOT_IMPLEMENTED.getStatusCode());
 		return null;
@@ -248,7 +261,7 @@ public class ObservationVariableServerResource extends ObservationVariableBaseSe
 	@Produces(MediaType.APPLICATION_JSON)
 	@Secured(UserType.DATA_CURATOR)
 	public BaseResult<ObservationVariable> putObservationVariableById(@PathParam("observationVariableDbId") String observationVariableDbId, ObservationVariable observationVariable)
-		throws IOException, SQLException
+			throws IOException, SQLException
 	{
 		resp.sendError(Response.Status.NOT_IMPLEMENTED.getStatusCode());
 		return null;

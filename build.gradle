@@ -5,7 +5,7 @@ plugins {
 group 'uk.ac.hutton.germinate.brapi'
 version '4.7.4'
 
-sourceCompatibility = 11
+sourceCompatibility = 21
 
 repositories {
     mavenCentral()
@@ -13,12 +13,12 @@ repositories {
         url 'https://repo.spring.io/plugins-release/'
     }
     maven {
-        url 'http://maven.imagej.net/content/repositories/public/'
+        url 'https://maven.imagej.net/content/repositories/public/'
     }
 }
 
 dependencies {
-    compile fileTree(dir: 'lib', include: ['*.jar'])
+    implementation fileTree(dir: 'lib', include: ['*.jar'])
 
     implementation 'org.json:json:20230227'
 
