@@ -19,8 +19,7 @@ import uk.ac.hutton.ics.brapi.resource.phenotyping.observation.ObservationVariab
 import uk.ac.hutton.ics.brapi.server.base.BaseServerResource;
 
 import java.net.URI;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static jhi.germinate.server.database.codegen.tables.Phenotypecategories.PHENOTYPECATEGORIES;
@@ -53,6 +52,8 @@ public class ObservationVariableBaseServerResource extends BaseServerResource
 													  String unitName = t.get(UNITS.UNIT_NAME);
 													  Integer categoryId = t.get(PHENOTYPECATEGORIES.ID);
 													  String categoryName = t.get(PHENOTYPECATEGORIES.NAME);
+													  Integer setSize = t.get(PHENOTYPES.SETSIZE);
+													  Boolean isTimeseries = t.get(PHENOTYPES.IS_TIMESERIES);
 
 													  Scale scale = new Scale();
 
@@ -135,6 +136,12 @@ public class ObservationVariableBaseServerResource extends BaseServerResource
 
 													  variable.setScale(scale);
 													  variable.setTrait(trait);
+													  variable.setAdditionalInfo(new HashMap<>());
+
+													  if (setSize != null)
+														  variable.getAdditionalInfo().put("setSize", String.valueOf(setSize));
+													  if (isTimeseries != null)
+														  variable.getAdditionalInfo().put("isTimeseries", String.valueOf(isTimeseries));
 
 													  return variable;
 												  }).collect(Collectors.toList());
