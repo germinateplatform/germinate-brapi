@@ -37,6 +37,7 @@ public class VariantServerResource extends BaseServerResource implements BrapiVa
 {
 	@Override
 	@GET
+	@NeedsDatasets
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	public BaseResult<ArrayResult<Variant>> getVariants(@QueryParam("variantDbId") String variantDbId,
@@ -45,7 +46,7 @@ public class VariantServerResource extends BaseServerResource implements BrapiVa
 														@QueryParam("referenceSetDbId") String referenceSetDbId,
 														@QueryParam("externalReferenceId") String externalReferenceId,
 														@QueryParam("externalReferenceSource") String externalReferenceSource)
-		throws SQLException, IOException
+			throws SQLException, IOException
 	{
 		try (Connection conn = Database.getConnection())
 		{
@@ -57,7 +58,7 @@ public class VariantServerResource extends BaseServerResource implements BrapiVa
 				conditions.add(DSL.concat(DATASETMEMBERS.DATASET_ID, DSL.val("-"), MARKERS.ID).eq(variantDbId));
 			// TODO: Other parameters
 
-			List<Variant> variants = getVariantsInternal(context, conditions, page, pageSize, req, resp, securityContext);
+			List<Variant> variants = getVariantsInternal(context, conditions, page, pageSize, req);
 
 			if (CollectionUtils.isEmpty(variants))
 				return new BaseResult<>(null, page, pageSize, 0);
@@ -68,16 +69,17 @@ public class VariantServerResource extends BaseServerResource implements BrapiVa
 
 	@Override
 	@GET
+	@NeedsDatasets
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	@Path("/{variantDbId}")
 	public BaseResult<Variant> getVariantById(@PathParam("variantDbId") String variantDbId)
-		throws IOException, SQLException
+			throws IOException, SQLException
 	{
 		try (Connection conn = Database.getConnection())
 		{
 			DSLContext context = Database.getContext(conn);
-			List<Variant> variants = getVariantsInternal(context, Collections.singletonList(DSL.concat(DATASETMEMBERS.DATASET_ID, DSL.val("-"), MARKERS.ID).eq(variantDbId)), page, pageSize, req, resp, securityContext);
+			List<Variant> variants = getVariantsInternal(context, Collections.singletonList(DSL.concat(DATASETMEMBERS.DATASET_ID, DSL.val("-"), MARKERS.ID).eq(variantDbId)), page, pageSize, req);
 
 			if (CollectionUtils.isEmpty(variants))
 				return new BaseResult<>(null, page, pageSize, 0);
@@ -87,12 +89,16 @@ public class VariantServerResource extends BaseServerResource implements BrapiVa
 	}
 
 	@Override
+	@NeedsDatasets
+	@Consumes(MediaType.APPLICATION_JSON)
+	@Produces(MediaType.APPLICATION_JSON)
+	@Path("/{variantDbId}/calls")
 	public BaseResult<CallResult<Call>> getVariantByIdCalls(@PathParam("variantDbId") String variantDbId,
 															@QueryParam("expandHomozygotes") Boolean expandHomozygotes,
 															@QueryParam("unknownString") String unknownString,
 															@QueryParam("sepPhased") String sepPhased,
 															@QueryParam("sepUnphased") String sepUnphased)
-		throws SQLException, IOException
+			throws SQLException, IOException
 	{
 		if (StringUtils.isEmpty(variantDbId) || !variantDbId.contains("-"))
 		{
@@ -100,8 +106,7 @@ public class VariantServerResource extends BaseServerResource implements BrapiVa
 			return null;
 		}
 
-		AuthenticationFilter.UserDetails userDetails = (AuthenticationFilter.UserDetails) securityContext.getUserPrincipal();
-		List<Integer> datasetIds = DatasetTableResource.getDatasetIdsForUser(req, userDetails, "genotype");
+		List<Integer> datasetIds = AuthorizationFilter.getDatasetIds(req, "genotype", true);
 
 		try (Connection conn = Database.getConnection())
 		{
@@ -123,6 +128,7 @@ public class VariantServerResource extends BaseServerResource implements BrapiVa
 
 			DatasetsRecord dataset = context.selectFrom(DATASETS)
 											.where(DATASETS.ID.in(datasetIds))
+											.and(DATASETS.DATASETTYPE_ID.eq(1))
 											.and(DATASETS.IS_EXTERNAL.eq(false))
 											.and(DATASETS.ID.cast(String.class).eq(parts[0]))
 											.fetchAny();
@@ -147,19 +153,19 @@ public class VariantServerResource extends BaseServerResource implements BrapiVa
 										.skip(pageSize * page)
 										.limit(pageSize)
 										.mapToObj(i -> new Call()
-											.setCallSetDbId(dataset.getId() + "-" + germplasmNamesToIds.get(germplasmNames.get(i)))
-											.setCallSetName(germplasmNames.get(i))
-											.setGenotypeValue(alleles.get(i))
-											.setVariantDbId(variantDbId)
-											.setVariantName(marker.getMarkerName()))
+												.setCallSetDbId(dataset.getId() + "-" + germplasmNamesToIds.get(germplasmNames.get(i)))
+												.setCallSetName(germplasmNames.get(i))
+												.setGenotypeValue(alleles.get(i))
+												.setVariantDbId(variantDbId)
+												.setVariantName(marker.getMarkerName()))
 										.collect(Collectors.toList());
 
 			CallResult<Call> callResult = new CallResult<Call>()
-				.setData(calls)
-				.setExpandHomozygotes(!params.isCollapse())
-				.setSepPhased(params.getSepPhased())
-				.setSepUnphased(params.getSepUnphased())
-				.setUnknownString(params.getUnknownString());
+					.setData(calls)
+					.setExpandHomozygotes(!params.isCollapse())
+					.setSepPhased(params.getSepPhased())
+					.setSepUnphased(params.getSepUnphased())
+					.setUnknownString(params.getUnknownString());
 			return new BaseResult<>(callResult, page, pageSize, alleles.size());
 		}
 	}

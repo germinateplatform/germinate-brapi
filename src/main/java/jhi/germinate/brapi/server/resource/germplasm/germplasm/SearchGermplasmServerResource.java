@@ -28,6 +28,7 @@ import static jhi.germinate.server.database.codegen.tables.Taxonomies.*;
 public class SearchGermplasmServerResource extends GermplasmBaseServerResource implements BrapiSearchGermplasmServerResource
 {
 	@POST
+	@NeedsDatasets
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	public Response postGermplasmSearch(GermplasmSearch search)

@@ -1,7 +1,7 @@
 package jhi.germinate.brapi.server.resource.core.study;
 
 import jhi.germinate.brapi.server.util.DateUtils;
-import jhi.germinate.server.AuthenticationFilter;
+import jhi.germinate.server.*;
 import jhi.germinate.server.database.codegen.tables.pojos.ViewTableDatasets;
 import jhi.germinate.server.resource.datasets.DatasetTableResource;
 import jhi.germinate.server.util.*;
@@ -28,7 +28,7 @@ public abstract class StudyBaseResource extends BaseServerResource
 		Map<Integer, List<Contact>> collaborators = new HashMap<>();
 
 		AuthenticationFilter.UserDetails userDetails = (AuthenticationFilter.UserDetails) securityContext.getUserPrincipal();
-		List<Integer> datasetIds = DatasetTableResource.getDatasetIdsForUser(req, userDetails, null);
+		List<Integer> datasetIds = AuthorizationFilter.getDatasetIds(req, null, true);
 
 		context.selectFrom(VIEW_TABLE_COLLABORATORS)
 			   .forEach(r -> {

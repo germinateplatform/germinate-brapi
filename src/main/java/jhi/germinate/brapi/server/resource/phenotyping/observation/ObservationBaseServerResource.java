@@ -1,7 +1,6 @@
 package jhi.germinate.brapi.server.resource.phenotyping.observation;
 
-import jhi.germinate.server.AuthenticationFilter;
-import jhi.germinate.server.resource.datasets.DatasetTableResource;
+import jhi.germinate.server.*;
 import org.jooq.*;
 import org.jooq.impl.DSL;
 import uk.ac.hutton.ics.brapi.resource.base.*;
@@ -27,10 +26,10 @@ public class ObservationBaseServerResource extends BaseServerResource
 	protected BaseResult<ArrayResult<Observation>> getObservation(DSLContext context, List<Condition> conditions)
 			throws SQLException
 	{
-		AuthenticationFilter.UserDetails userDetails = (AuthenticationFilter.UserDetails) securityContext.getUserPrincipal();
-		List<Integer> datasetIds = DatasetTableResource.getDatasetIdsForUser(req, userDetails, "trials");
+		List<Integer> datasetIds = AuthorizationFilter.getDatasetIds(req, "trials", true);
 
 		SelectConditionStep<?> step = context.select(DSL.asterisk())
+											 .hint("SQL_CALC_FOUND_ROWS")
 											 .from(PHENOTYPEDATA)
 											 .leftJoin(TRIALSETUP).on(TRIALSETUP.ID.eq(PHENOTYPEDATA.TRIALSETUP_ID))
 											 .leftJoin(PHENOTYPES).on(PHENOTYPES.ID.eq(PHENOTYPEDATA.PHENOTYPE_ID))

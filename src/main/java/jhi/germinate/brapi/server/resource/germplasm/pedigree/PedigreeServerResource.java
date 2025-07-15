@@ -6,7 +6,6 @@ import jakarta.ws.rs.core.*;
 import jhi.germinate.server.*;
 import jhi.germinate.server.database.codegen.enums.ViewTablePedigreesRelationshipType;
 import jhi.germinate.server.database.codegen.tables.pojos.ViewTablePedigrees;
-import jhi.germinate.server.resource.datasets.DatasetTableResource;
 import jhi.germinate.server.util.*;
 import org.jooq.*;
 import org.jooq.Record;
@@ -34,6 +33,7 @@ public class PedigreeServerResource extends BaseServerResource implements BrapiP
 	@GET
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
+	@NeedsDatasets
 	@Secured
 	@PermitAll
 	public BaseResult<ArrayResult<Pedigree>> getPedigree(@QueryParam("accessionNumber") String accessionNumber,
@@ -59,21 +59,20 @@ public class PedigreeServerResource extends BaseServerResource implements BrapiP
 														 @QueryParam("externalReferenceId") String externalReferenceId,
 														 @QueryParam("externalReferenceSource") String externalReferenceSource
 	)
-		throws IOException, SQLException
+			throws IOException, SQLException
 	{
 		try (Connection conn = Database.getConnection())
 		{
 			DSLContext context = Database.getContext(conn);
 
-			AuthenticationFilter.UserDetails userDetails = (AuthenticationFilter.UserDetails) securityContext.getUserPrincipal();
-			List<Integer> datasetIds = DatasetTableResource.getDatasetIdsForUser(req, userDetails, "pedigree");
+			List<Integer> datasetIds = AuthorizationFilter.getDatasetIds(req, "pedigree", true);
 
 			Map<String, Pedigree> lookup = new HashMap<>();
 			context.select(
-					   GERMINATEBASE.ID.as("germplasmDbId"),
-					   GERMINATEBASE.NAME.as("germplasmName"),
-					   GERMINATEBASE.DISPLAY_NAME.as("germplasmDisplayName"),
-					   MCPD.PUID.as("germplasmPUI"))
+						   GERMINATEBASE.ID.as("germplasmDbId"),
+						   GERMINATEBASE.NAME.as("germplasmName"),
+						   GERMINATEBASE.DISPLAY_NAME.as("germplasmDisplayName"),
+						   MCPD.PUID.as("germplasmPUI"))
 				   .from(GERMINATEBASE)
 				   .leftJoin(MCPD).on(MCPD.GERMINATEBASE_ID.eq(GERMINATEBASE.ID))
 				   .forEach(r -> lookup.put(r.get("germplasmName", String.class), new Pedigree().setGermplasmDbId(r.get("germplasmDbId", String.class))
@@ -81,10 +80,10 @@ public class PedigreeServerResource extends BaseServerResource implements BrapiP
 																								.setGermplasmPUI(r.get("germplasmPUI", String.class))));
 
 			SelectJoinStep<?> step = context.select(
-												GERMINATEBASE.ID.as("germplasmDbId"),
-												GERMINATEBASE.NAME.as("germplasmName"),
-												GERMINATEBASE.DISPLAY_NAME.as("defaultDisplayName"),
-												MCPD.PUID.as("germplasmPUI")
+													GERMINATEBASE.ID.as("germplasmDbId"),
+													GERMINATEBASE.NAME.as("germplasmName"),
+													GERMINATEBASE.DISPLAY_NAME.as("defaultDisplayName"),
+													MCPD.PUID.as("germplasmPUI")
 											)
 											.hint("SQL_CALC_FOUND_ROWS")
 											.from(GERMINATEBASE)
@@ -112,7 +111,11 @@ public class PedigreeServerResource extends BaseServerResource implements BrapiP
 				step.where(DSL.condition("JSON_CONTAINS(" + SYNONYMS.SYNONYMS_.getName() + ", '\"" + cleaned + "\"')"));
 			}
 
-			List<Pedigree> base = step.fetchInto(Pedigree.class);
+			List<Pedigree> base = step.limit(pageSize)
+									  .offset(pageSize * page)
+									  .fetchInto(Pedigree.class);
+
+			long totalCount = context.fetchOne("SELECT FOUND_ROWS()").into(Long.class);
 
 			Map<String, List<ViewTablePedigrees>> parentToChildren = new HashMap<>();
 			Map<String, List<ViewTablePedigrees>> childrenToParents = new HashMap<>();
@@ -165,7 +168,7 @@ public class PedigreeServerResource extends BaseServerResource implements BrapiP
 			}
 
 			return new BaseResult<>(new ArrayResult<Pedigree>()
-				.setData(new ArrayList<>(walker.getResult().values())), 0, 1, walker.getResult().size());
+					.setData(new ArrayList<>(walker.getResult().values())), page, walker.getResult().size(), walker.getResult().size());
 		}
 	}
 
@@ -263,7 +266,7 @@ public class PedigreeServerResource extends BaseServerResource implements BrapiP
 	@Secured
 	@PermitAll
 	public BaseResult<ArrayResult<Pedigree>> postPedigree(Pedigree[] newPedigree)
-		throws IOException, SQLException
+			throws IOException, SQLException
 	{
 		resp.sendError(Response.Status.NOT_IMPLEMENTED.getStatusCode());
 		return null;
@@ -276,7 +279,7 @@ public class PedigreeServerResource extends BaseServerResource implements BrapiP
 	@Secured
 	@PermitAll
 	public BaseResult<ArrayResult<Pedigree>> putPedigree(Map<String, Pedigree> newPedigree)
-		throws IOException, SQLException
+			throws IOException, SQLException
 	{
 		resp.sendError(Response.Status.NOT_IMPLEMENTED.getStatusCode());
 		return null;

@@ -3,7 +3,6 @@ package jhi.germinate.brapi.server.resource.other;
 import jhi.germinate.brapi.server.Brapi;
 import jhi.germinate.server.*;
 import jhi.germinate.server.database.codegen.tables.records.DatasetsRecord;
-import jhi.germinate.server.resource.datasets.DatasetTableResource;
 import jhi.germinate.server.util.*;
 import jhi.germinate.server.util.hdf5.Hdf5ToFJTabbedConverter;
 import org.jooq.DSLContext;
@@ -11,6 +10,7 @@ import org.jooq.DSLContext;
 import jakarta.annotation.security.PermitAll;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.*;
+
 import java.io.*;
 import java.nio.file.Files;
 import java.sql.*;
@@ -27,10 +27,11 @@ public class GenotypeFileServerResource extends FileServerResource
 	private String datasetId;
 
 	@GET
+	@NeedsDatasets
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces("text/tab-separated-values")
 	public Response getGenotypeFile()
-		throws IOException, SQLException
+			throws IOException, SQLException
 	{
 		if (StringUtils.isEmpty(datasetId))
 		{
@@ -38,8 +39,7 @@ public class GenotypeFileServerResource extends FileServerResource
 			return null;
 		}
 
-		AuthenticationFilter.UserDetails userDetails = (AuthenticationFilter.UserDetails) securityContext.getUserPrincipal();
-		List<Integer> datasetIds = DatasetTableResource.getDatasetIdsForUser(req, userDetails, "genotype");
+		List<Integer> datasetIds = AuthorizationFilter.getDatasetIds(req, "genotype", true);
 
 		try (Connection conn = Database.getConnection())
 		{
@@ -47,7 +47,6 @@ public class GenotypeFileServerResource extends FileServerResource
 			DatasetsRecord ds = context.selectFrom(DATASETS)
 									   .where(DATASETS.ID.in(datasetIds))
 									   .and(DATASETS.IS_EXTERNAL.eq(false))
-									   .and(DATASETS.DATASETTYPE_ID.eq(1))
 									   .and(DATASETS.ID.cast(String.class).eq(datasetId)).fetchAny();
 
 			if (ds == null || StringUtils.isEmpty(ds.getSourceFile()))
@@ -77,9 +76,9 @@ public class GenotypeFileServerResource extends FileServerResource
 
 			java.nio.file.Path zipFilePath = resultFile.toPath();
 			return Response.ok((StreamingOutput) output -> {
-				Files.copy(zipFilePath, output);
-				Files.deleteIfExists(zipFilePath);
-			})
+							   Files.copy(zipFilePath, output);
+							   Files.deleteIfExists(zipFilePath);
+						   })
 						   .type("text/tab-separated-values")
 						   .header("content-disposition", "attachment;filename= \"" + resultFile.getName() + "\"")
 						   .header("content-length", resultFile.length())

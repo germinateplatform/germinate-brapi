@@ -5,12 +5,11 @@ import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.*;
 import jhi.germinate.server.*;
 import jhi.germinate.server.database.codegen.tables.records.*;
-import jhi.germinate.server.resource.datasets.DatasetTableResource;
 import jhi.germinate.server.util.*;
 import org.jooq.*;
 import uk.ac.hutton.ics.brapi.resource.base.*;
 import uk.ac.hutton.ics.brapi.resource.core.location.*;
-import uk.ac.hutton.ics.brapi.resource.phenotyping.observation.Observation;
+import uk.ac.hutton.ics.brapi.resource.phenotyping.observation.*;
 import uk.ac.hutton.ics.brapi.server.phenotyping.observation.BrapiObservationServerResource;
 
 import java.io.IOException;
@@ -19,6 +18,7 @@ import java.sql.*;
 import java.text.SimpleDateFormat;
 import java.util.*;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 import static jhi.germinate.server.database.codegen.tables.Datasets.DATASETS;
 import static jhi.germinate.server.database.codegen.tables.Germinatebase.GERMINATEBASE;
@@ -48,6 +48,7 @@ public class ObservationServerResource extends ObservationBaseServerResource imp
 
 	@Override
 	@GET
+	@NeedsDatasets
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	public BaseResult<ArrayResult<Observation>> getObservations(
@@ -80,7 +81,9 @@ public class ObservationServerResource extends ObservationBaseServerResource imp
 			DSLContext context = Database.getContext(conn);
 			List<Condition> conditions = new ArrayList<>();
 
-			addCondition(conditions, DATASETS.ID, studyDbId);
+			List<String> requestedIds = AuthorizationFilter.restrictDatasetIds(req, "trials", studyDbId, true).stream().map(Object::toString).collect(Collectors.toList());
+
+			conditions.add(DATASETS.ID.in(requestedIds));
 			addCondition(conditions, DATASETS.EXPERIMENT_ID, trialDbId);
 			addCondition(conditions, TRIALSETUP.GERMINATEBASE_ID, germplasmDbId);
 			addCondition(conditions, PHENOTYPES.ID, observationVariableDbId);
@@ -91,6 +94,7 @@ public class ObservationServerResource extends ObservationBaseServerResource imp
 
 	@Override
 	@POST
+	@NeedsDatasets
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	public BaseResult<ArrayResult<Observation>> postObservations(List<Observation> newObservations)
@@ -100,7 +104,7 @@ public class ObservationServerResource extends ObservationBaseServerResource imp
 		{
 			return new BaseResult<ArrayResult<Observation>>()
 					.setResult(new ArrayResult<Observation>()
-									   .setData(new ArrayList<>()));
+							.setData(new ArrayList<>()));
 		}
 
 		Set<Integer> traitIds = new HashSet<>();
@@ -109,8 +113,7 @@ public class ObservationServerResource extends ObservationBaseServerResource imp
 		Set<Integer> studyDbIds = new HashSet<>();
 
 		// Check that all requested study ids are valid and the user has permissions
-		AuthenticationFilter.UserDetails userDetails = (AuthenticationFilter.UserDetails) securityContext.getUserPrincipal();
-		List<Integer> datasetIds = DatasetTableResource.getDatasetIdsForUser(req, userDetails, "trials");
+		List<Integer> datasetIds = AuthorizationFilter.getDatasetIds(req, "trials", true);
 
 		for (Observation n : newObservations)
 		{
@@ -234,11 +237,13 @@ public class ObservationServerResource extends ObservationBaseServerResource imp
 						GeometryPoint p = (GeometryPoint) o.getGeoCoordinates().getGeometry().getCoordinates();
 						Double[] coords = p.getCoordinates();
 
-						if (coords.length >= 2) {
+						if (coords.length >= 2)
+						{
 							observationUnit.setLongitude(BigDecimal.valueOf(coords[0]));
 							observationUnit.setLatitude(BigDecimal.valueOf(coords[1]));
 
-							if (coords.length > 2) {
+							if (coords.length > 2)
+							{
 								observationUnit.setElevation(BigDecimal.valueOf(coords[2]));
 							}
 
@@ -352,6 +357,7 @@ public class ObservationServerResource extends ObservationBaseServerResource imp
 
 	@Override
 	@PUT
+	@NeedsDatasets
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	public BaseResult<ArrayResult<Observation>> putObservations(Map<String, Observation> observations)
@@ -364,9 +370,11 @@ public class ObservationServerResource extends ObservationBaseServerResource imp
 	@Override
 	@Path("/table")
 	@GET
+	@NeedsDatasets
 	@Consumes(MediaType.APPLICATION_JSON)
-	@Produces(MediaType.APPLICATION_JSON)
+	@Produces({MediaType.APPLICATION_JSON, "text/csv", "text/tab-separated-values"})
 	public Response getObservationTable(
+			@HeaderParam("Accept") String header,
 			@QueryParam("observationUnitDbId") String observationUnitDbId,
 			@QueryParam("observationVariableDbId") String observationVariableDbId,
 			@QueryParam("locationDbId") String locationDbId,
@@ -387,7 +395,69 @@ public class ObservationServerResource extends ObservationBaseServerResource imp
 			@QueryParam("observationUnitLevelRelationshipDbId") String observationUnitLevelRelationshipDbId)
 			throws IOException, SQLException
 	{
-		resp.sendError(Response.Status.BAD_REQUEST.getStatusCode());
+		BaseResult<ArrayResult<Observation>> observations = getObservations(null, observationUnitDbId, observationVariableDbId, locationDbId, seasonDbId, observationTimeStampRangeStart, observationTimeStampRangeEnd, observationUnitLevelName, observationUnitLevelOrder, observationUnitLevelCode, observationUnitLevelRelationshipName, observationUnitLevelRelationshipOrder, observationUnitLevelRelationshipCode, observationUnitLevelRelationshipDbId, null, programDbId, trialDbId, studyDbId, germplasmDbId, null, null);
+
+		switch (header)
+		{
+			case "text/csv":
+			case "text/tab-separated-values":
+				return Response.status(Response.Status.NOT_IMPLEMENTED).build();
+			case MediaType.APPLICATION_JSON:
+				TableResult<List<String>> result = new TableResult<>();
+				result.setHeaderRow(Arrays.asList("observationTimeStamp", "observationUnitDbId", "observationUnitName", "studyDbId", "germplasmDbId", "germplasmName"));
+
+				// Get unique observation variables
+				Map<String, ObservationVariable> distinct = new HashMap<>();
+				observations.getResult()
+							.getData()
+							.forEach(o -> {
+								if (!distinct.containsKey(o.getObservationVariableDbId()))
+								{
+									distinct.put(o.getObservationVariableDbId(), new ObservationVariable()
+											.setObservationVariableDbId(o.getObservationVariableDbId())
+											.setObservationVariableName(o.getObservationVariableName()));
+								}
+							});
+
+				// Order them by their ids
+				List<String> ordered = distinct.keySet().stream().sorted().toList();
+				// Set observation variable list
+				result.setObservationVariables(ordered.stream().map(distinct::get).toList());
+
+				// Now set the data
+				List<List<String>> data = new ArrayList<>();
+
+				observations.getResult()
+							.getData()
+							.forEach(o -> {
+								List<String> row = new ArrayList<>(Arrays.asList(o.getObservationTimeStamp(),
+										o.getObservationUnitDbId(),
+										Objects.requireNonNullElse(o.getObservationUnitName(), ""),
+										o.getStudyDbId(),
+										o.getGermplasmDbId(),
+										o.getGermplasmName()));
+
+								for (String ov : ordered)
+								{
+									if (Objects.equals(ov, o.getObservationVariableDbId()))
+										row.add(o.getValue());
+									else
+										row.add("");
+								}
+
+								data.add(row);
+							});
+
+				result.setData(data);
+
+				return Response.ok(new BaseResult<TableResult<List<String>>>()
+						.setResult(result)
+						.setMetadata(observations.getMetadata())
+				).build();
+			default:
+				break;
+		}
+
 		return null;
 	}
 

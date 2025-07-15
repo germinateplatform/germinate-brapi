@@ -7,7 +7,6 @@ import jhi.germinate.brapi.server.Brapi;
 import jhi.germinate.brapi.server.util.*;
 import jhi.germinate.server.*;
 import jhi.germinate.server.database.codegen.tables.records.*;
-import jhi.germinate.server.resource.datasets.DatasetTableResource;
 import jhi.germinate.server.util.*;
 import org.jooq.*;
 import org.jooq.impl.DSL;
@@ -32,6 +31,7 @@ import static jhi.germinate.server.database.codegen.tables.Markers.MARKERS;
 public class CallSetServerResource extends CallSetBaseServerResource implements BrapiCallSetServerResource
 {
 	@GET
+	@NeedsDatasets
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	public BaseResult<ArrayResult<CallSet>> getCallsets(@QueryParam("callSetDbId") String callSetDbId,
@@ -43,22 +43,18 @@ public class CallSetServerResource extends CallSetBaseServerResource implements 
 														@QueryParam("externalReferenceSource") String externalReferenceSource)
 			throws IOException, SQLException
 	{
-		AuthenticationFilter.UserDetails userDetails = (AuthenticationFilter.UserDetails) securityContext.getUserPrincipal();
-		List<Integer> datasets = DatasetTableResource.getDatasetIdsForUser(req, userDetails, "genotype");
+		List<Integer> datasetIds = AuthorizationFilter.restrictDatasetIds(req, "genotype", variantSetDbId, true);
 
 		try (Connection conn = Database.getConnection())
 		{
 			DSLContext context = Database.getContext(conn);
 			List<Condition> conditions = new ArrayList<>();
-
-			conditions.add(DATASETMEMBERS.DATASET_ID.in(datasets));
+			conditions.add(DATASETMEMBERS.DATASET_ID.in(datasetIds));
 
 			if (!StringUtils.isEmpty(callSetDbId))
 				conditions.add(DSL.concat(DATASETMEMBERS.DATASET_ID, DSL.val("-"), GERMINATEBASE.ID).eq(callSetDbId));
 			if (!StringUtils.isEmpty(callSetName))
 				conditions.add(GERMINATEBASE.NAME.eq(callSetName));
-			if (!StringUtils.isEmpty(variantSetDbId))
-				conditions.add(DATASETMEMBERS.DATASET_ID.cast(String.class).eq(variantSetDbId));
 			if (!StringUtils.isEmpty(germplasmDbId))
 				conditions.add(GERMINATEBASE.ID.cast(String.class).eq(germplasmDbId));
 
@@ -66,12 +62,13 @@ public class CallSetServerResource extends CallSetBaseServerResource implements 
 
 			long totalCount = context.fetchOne("SELECT FOUND_ROWS()").into(Long.class);
 			return new BaseResult<>(new ArrayResult<CallSet>()
-											.setData(callSets), page, pageSize, totalCount);
+					.setData(callSets), page, pageSize, totalCount);
 		}
 	}
 
 	@GET
 	@Path("/{callSetDbId}")
+	@NeedsDatasets
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	public BaseResult<CallSet> getCallSetById(@PathParam("callSetDbId") String callSetDbId)
@@ -92,6 +89,7 @@ public class CallSetServerResource extends CallSetBaseServerResource implements 
 	@Override
 	@GET
 	@Path("/{callSetDbId}/calls")
+	@NeedsDatasets
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	public BaseResult<CallResult<Call>> getCallSetByIdCalls(@PathParam("callSetDbId") String callSetDbId,
@@ -107,8 +105,7 @@ public class CallSetServerResource extends CallSetBaseServerResource implements 
 			return null;
 		}
 
-		AuthenticationFilter.UserDetails userDetails = (AuthenticationFilter.UserDetails) securityContext.getUserPrincipal();
-		List<Integer> datasets = DatasetTableResource.getDatasetIdsForUser(req, userDetails, "genotype");
+		List<Integer> datasets = AuthorizationFilter.getDatasetIds(req, "genotype", true);
 
 		try (Connection conn = Database.getConnection())
 		{
@@ -117,6 +114,7 @@ public class CallSetServerResource extends CallSetBaseServerResource implements 
 
 			DatasetsRecord dataset = context.selectFrom(DATASETS)
 											.where(DATASETS.ID.in(datasets))
+											.and(DATASETS.DATASETTYPE_ID.eq(1))
 											.and(DATASETS.IS_EXTERNAL.eq(false))
 											.and(DATASETS.ID.cast(String.class).eq(parts[0]))
 											.fetchAny();

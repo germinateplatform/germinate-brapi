@@ -37,6 +37,7 @@ public class VariantSetServerResource extends BaseServerResource implements Brap
 {
 	@Override
 	@GET
+	@NeedsDatasets
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	public BaseResult<ArrayResult<VariantSet>> getVariantSets(@QueryParam("variantSetDbId") String variantSetDbId,
@@ -49,7 +50,7 @@ public class VariantSetServerResource extends BaseServerResource implements Brap
 															  @QueryParam("studyName") String studyName,
 															  @QueryParam("externalReferenceId") String externalReferenceId,
 															  @QueryParam("externalReferenceSource") String externalReferenceSource)
-		throws SQLException, IOException
+			throws SQLException, IOException
 	{
 		try (Connection conn = Database.getConnection())
 		{
@@ -67,25 +68,26 @@ public class VariantSetServerResource extends BaseServerResource implements Brap
 			if (!StringUtils.isEmpty(studyName))
 				conditions.add(DATASETS.NAME.cast(String.class).eq(studyName));
 
-			List<VariantSet> result = getVariantSets(context, conditions, page, pageSize, req, resp, securityContext);
+			List<VariantSet> result = getVariantSets(context, conditions, page, pageSize, req);
 
 			long totalCount = context.fetchOne("SELECT FOUND_ROWS()").into(Long.class);
 			return new BaseResult<>(new ArrayResult<VariantSet>()
-				.setData(result), page, pageSize, totalCount);
+					.setData(result), page, pageSize, totalCount);
 		}
 	}
 
 	@GET
 	@Path("/{variantSetDbId}")
+	@NeedsDatasets
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	public BaseResult<VariantSet> getVariantSetById(@PathParam("variantSetDbId") String variantSetDbId)
-		throws SQLException, IOException
+			throws SQLException, IOException
 	{
 		try (Connection conn = Database.getConnection())
 		{
 			DSLContext context = Database.getContext(conn);
-			List<VariantSet> results = getVariantSets(context, Collections.singletonList(DATASETS.ID.cast(String.class).eq(variantSetDbId)), page, pageSize, req, resp, securityContext);
+			List<VariantSet> results = getVariantSets(context, Collections.singletonList(DATASETS.ID.cast(String.class).eq(variantSetDbId)), page, pageSize, req);
 			VariantSet result = CollectionUtils.isEmpty(results) ? null : results.get(0);
 
 			return new BaseResult<>(result, page, pageSize, 1);
@@ -101,7 +103,7 @@ public class VariantSetServerResource extends BaseServerResource implements Brap
 	public BaseResult<ArrayResult<CallSet>> getVariantSetByIdCallSet(@PathParam("variantSetDbId") String variantSetDbId,
 																	 @QueryParam("callSetDbId") String callSetDbId,
 																	 @QueryParam("callSetName") String callSetName)
-		throws SQLException, IOException
+			throws SQLException, IOException
 	{
 		resp.sendError(Response.Status.NOT_IMPLEMENTED.getStatusCode());
 		return null;
@@ -112,7 +114,7 @@ public class VariantSetServerResource extends BaseServerResource implements Brap
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	public BaseResult<VariantSet> postVariantSetExtract(VariantSetExtract extract)
-		throws SQLException, IOException
+			throws SQLException, IOException
 	{
 		resp.sendError(Response.Status.NOT_IMPLEMENTED.getStatusCode());
 		return null;
@@ -120,18 +122,18 @@ public class VariantSetServerResource extends BaseServerResource implements Brap
 
 	@Override
 	@GET
+	@NeedsDatasets
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	@Path("/{variantSetDbId}/calls")
 	public BaseResult<CallResult<Call>> getVariantSetByIdCalls(@PathParam("variantSetDbId") String variantSetDbId,
-																@QueryParam("expandHomozygotes") Boolean expandHomozygotes,
-																@QueryParam("unknownString") String unknownString,
-																@QueryParam("sepPhased") String sepPhased,
-																@QueryParam("sepUnphased") String sepUnphased)
-		throws SQLException, IOException
+															   @QueryParam("expandHomozygotes") Boolean expandHomozygotes,
+															   @QueryParam("unknownString") String unknownString,
+															   @QueryParam("sepPhased") String sepPhased,
+															   @QueryParam("sepUnphased") String sepUnphased)
+			throws SQLException, IOException
 	{
-		AuthenticationFilter.UserDetails userDetails = (AuthenticationFilter.UserDetails) securityContext.getUserPrincipal();
-		List<Integer> datasetIds = DatasetTableResource.getDatasetIdsForUser(req, userDetails, "genotype");
+		List<Integer> datasetIds = AuthorizationFilter.getDatasetIds(req, "genotype", true);
 
 		if (StringUtils.isEmpty(variantSetDbId))
 		{
@@ -232,20 +234,20 @@ public class VariantSetServerResource extends BaseServerResource implements Brap
 											int markerIndex = (mStart + i) % markerCount;
 
 											return new Call()
-												.setCallSetDbId(dataset.getId() + "-" + germplasmNamesToIds.get(germplasmNames.get(germplasmIndex)))
-												.setCallSetName(germplasmNames.get(germplasmIndex))
-												.setGenotypeValue(alleles.get(i))
-												.setVariantDbId(dataset.getId() + "-" + markerNamesToIds.get(markerNames.get(markerIndex)))
-												.setVariantName(markerNames.get(markerIndex));
+													.setCallSetDbId(dataset.getId() + "-" + germplasmNamesToIds.get(germplasmNames.get(germplasmIndex)))
+													.setCallSetName(germplasmNames.get(germplasmIndex))
+													.setGenotypeValue(alleles.get(i))
+													.setVariantDbId(dataset.getId() + "-" + markerNamesToIds.get(markerNames.get(markerIndex)))
+													.setVariantName(markerNames.get(markerIndex));
 										})
 										.collect(Collectors.toList());
 
 			CallResult<Call> callResult = new CallResult<Call>()
-				.setData(calls)
-				.setExpandHomozygotes(!params.isCollapse())
-				.setSepPhased(params.getSepPhased())
-				.setSepUnphased(params.getSepUnphased())
-				.setUnknownString(params.getUnknownString());
+					.setData(calls)
+					.setExpandHomozygotes(!params.isCollapse())
+					.setSepPhased(params.getSepPhased())
+					.setSepUnphased(params.getSepUnphased())
+					.setUnknownString(params.getUnknownString());
 			return new BaseResult<>(callResult, page, pageSize, markerCount * germplasmCount);
 		}
 	}
@@ -257,7 +259,7 @@ public class VariantSetServerResource extends BaseServerResource implements Brap
 	@Path("/{variantSetDbId}/variants")
 	public BaseResult<ArrayResult<Variant>> getVariantSetByIdVariant(@PathParam("variantSetDbId") String variantSetDbId,
 																	 @QueryParam("variantDbId") String variantDbId)
-		throws SQLException, IOException
+			throws SQLException, IOException
 	{
 		resp.sendError(Response.Status.NOT_IMPLEMENTED.getStatusCode());
 		return null;

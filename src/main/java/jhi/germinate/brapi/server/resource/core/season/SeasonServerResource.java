@@ -27,6 +27,7 @@ public class SeasonServerResource extends SeasonBaseServerResource implements Br
 	@GET
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
+	@NeedsDatasets
 	@Secured
 	@PermitAll
 	public BaseResult<ArrayResult<Season>> getSeasons(@QueryParam("seasonDbId") String seasonDbId,
@@ -61,6 +62,7 @@ public class SeasonServerResource extends SeasonBaseServerResource implements Br
 	@Path("/{seasonDbId}")
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
+	@NeedsDatasets
 	@Secured
 	@PermitAll
 	public BaseResult<Season> getSeasonById(@PathParam("seasonDbId") String seasonDbId)

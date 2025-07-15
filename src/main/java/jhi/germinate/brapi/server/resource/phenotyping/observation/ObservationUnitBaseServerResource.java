@@ -1,7 +1,6 @@
 package jhi.germinate.brapi.server.resource.phenotyping.observation;
 
-import jhi.germinate.server.AuthenticationFilter;
-import jhi.germinate.server.resource.datasets.DatasetTableResource;
+import jhi.germinate.server.*;
 import jhi.germinate.server.util.*;
 import org.jooq.*;
 import org.jooq.impl.DSL;
@@ -26,8 +25,7 @@ public class ObservationUnitBaseServerResource extends BaseServerResource
 	protected BaseResult<ArrayResult<ObservationUnit>> getObservationUnitsBase(DSLContext context, List<Condition> conditions, boolean includeObservations)
 			throws SQLException
 	{
-		AuthenticationFilter.UserDetails userDetails = (AuthenticationFilter.UserDetails) securityContext.getUserPrincipal();
-		List<Integer> datasetIds = DatasetTableResource.getDatasetIdsForUser(req, userDetails, "trials");
+		List<Integer> datasetIds = AuthorizationFilter.getDatasetIds(req, "trials", true);
 
 		SelectConditionStep<?> step = context.select(
 													 TRIALSETUP.ID.as("observationUnitDbId"),

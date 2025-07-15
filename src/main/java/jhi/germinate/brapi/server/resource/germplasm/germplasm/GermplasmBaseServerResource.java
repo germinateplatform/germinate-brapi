@@ -1,11 +1,10 @@
 package jhi.germinate.brapi.server.resource.germplasm.germplasm;
 
 import jakarta.ws.rs.core.Response;
-import jhi.germinate.server.AuthenticationFilter;
+import jhi.germinate.server.*;
 import jhi.germinate.server.database.codegen.enums.GermplasminstitutionsType;
 import jhi.germinate.server.database.codegen.tables.pojos.ViewTableInstitutions;
 import jhi.germinate.server.database.codegen.tables.records.*;
-import jhi.germinate.server.resource.datasets.DatasetTableResource;
 import jhi.germinate.server.util.*;
 import org.jooq.*;
 import uk.ac.hutton.ics.brapi.resource.base.*;
@@ -281,8 +280,7 @@ public abstract class GermplasmBaseServerResource extends BaseServerResource
 	protected BaseResult<ArrayResult<Germplasm>> getGermplasm(DSLContext context, List<Condition> conditions)
 		throws SQLException
 	{
-		AuthenticationFilter.UserDetails userDetails = (AuthenticationFilter.UserDetails) securityContext.getUserPrincipal();
-		List<Integer> datasetIds = DatasetTableResource.getDatasetIdsForUser(req, userDetails, "pedigree");
+		List<Integer> datasetIds = AuthorizationFilter.getDatasetIds(req, "pedigree", true);
 
 		SelectJoinStep<?> step = context.select(
 											GERMINATEBASE.NAME.as("accessionNumber"),

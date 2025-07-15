@@ -55,6 +55,8 @@ public class SearchAttributeValueServerResource extends AttributeValueBaseServer
 		}
 	}
 
+	@GET
+	@Path("/{searchResultsDbId}")
 	public BaseResult<ArrayResult<AttributeValue>> getAttributeValueSearchAsync(@PathParam("searchResultsDbId") String searchResultsDbId)
 		throws SQLException, IOException
 	{

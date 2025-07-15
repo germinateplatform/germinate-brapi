@@ -1,7 +1,6 @@
 package jhi.germinate.brapi.server.resource.genotyping.map;
 
 import jhi.germinate.server.*;
-import jhi.germinate.server.resource.datasets.DatasetTableResource;
 import jhi.germinate.server.util.*;
 import org.jooq.*;
 import org.jooq.impl.DSL;
@@ -13,6 +12,7 @@ import uk.ac.hutton.ics.brapi.server.genotyping.map.BrapiMapServerResource;
 import jakarta.annotation.security.PermitAll;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.*;
+
 import java.io.IOException;
 import java.sql.*;
 import java.util.List;
@@ -29,6 +29,7 @@ public class MapServerResource extends BaseServerResource implements BrapiMapSer
 {
 	@Override
 	@GET
+	@NeedsDatasets
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	public BaseResult<ArrayResult<Map>> getMaps(@QueryParam("mapDbId") String mapDbId,
@@ -39,22 +40,21 @@ public class MapServerResource extends BaseServerResource implements BrapiMapSer
 												@QueryParam("programDbId") String programDbId,
 												@QueryParam("trialDbId") String trialDbId,
 												@QueryParam("studyDbId") String studyDbId)
-		throws IOException, SQLException
+			throws IOException, SQLException
 	{
-		AuthenticationFilter.UserDetails userDetails = (AuthenticationFilter.UserDetails) securityContext.getUserPrincipal();
-		List<Integer> datasetIds = DatasetTableResource.getDatasetIdsForUser(req, userDetails, "genotype");
+		List<Integer> datasetIds = AuthorizationFilter.restrictDatasetIds(req, "genotype", studyDbId, true);
 
 		try (Connection conn = Database.getConnection())
 		{
 			DSLContext context = Database.getContext(conn);
 			SelectJoinStep<?> step = context.select(
-				MAPS.ID.as("mapDbId"),
-				MAPS.NAME.as("mapName"),
-				DSL.countDistinct(MAPDEFINITIONS.CHROMOSOME).as("linkageGroupCount"),
-				DSL.count(MAPDEFINITIONS.MARKER_ID).as("markerCount"),
-				DSL.val("Genetic").as("type"),
-				MAPS.CREATED_ON.as("publishedDate")
-			)
+													MAPS.ID.as("mapDbId"),
+													MAPS.NAME.as("mapName"),
+													DSL.countDistinct(MAPDEFINITIONS.CHROMOSOME).as("linkageGroupCount"),
+													DSL.count(MAPDEFINITIONS.MARKER_ID).as("markerCount"),
+													DSL.val("Genetic").as("type"),
+													MAPS.CREATED_ON.as("publishedDate")
+											)
 											.hint("SQL_CALC_FOUND_ROWS")
 											.from(MAPS)
 											.leftJoin(MAPDEFINITIONS).on(MAPDEFINITIONS.MAP_ID.eq(MAPS.ID));
@@ -62,14 +62,11 @@ public class MapServerResource extends BaseServerResource implements BrapiMapSer
 			step.where(MAPS.VISIBILITY.eq(true));
 
 			// Filter on studyDbId (datasets.id)
-			if (!StringUtils.isEmpty(studyDbId))
-			{
-				step.where(DSL.exists(DSL.selectOne()
-										 .from(DATASETMEMBERS)
-										 .where(DATASETMEMBERS.FOREIGN_ID.eq(MAPDEFINITIONS.MARKER_ID))
-										 .and(DATASETMEMBERS.DATASETMEMBERTYPE_ID.eq(1))
-										 .and(DATASETMEMBERS.DATASET_ID.cast(String.class).eq(studyDbId))));
-			}
+			step.where(DSL.exists(DSL.selectOne()
+									 .from(DATASETMEMBERS)
+									 .where(DATASETMEMBERS.FOREIGN_ID.eq(MAPDEFINITIONS.MARKER_ID))
+									 .and(DATASETMEMBERS.DATASETMEMBERTYPE_ID.eq(1))
+									 .and(DATASETMEMBERS.DATASET_ID.in(datasetIds))));
 
 			// Filter on trialDbId (experiments.id)
 			if (!StringUtils.isEmpty(trialDbId))
@@ -94,7 +91,7 @@ public class MapServerResource extends BaseServerResource implements BrapiMapSer
 
 			long totalCount = context.fetchOne("SELECT FOUND_ROWS()").into(Long.class);
 			return new BaseResult<>(new ArrayResult<Map>()
-				.setData(result), page, pageSize, totalCount);
+					.setData(result), page, pageSize, totalCount);
 		}
 	}
 
@@ -104,19 +101,19 @@ public class MapServerResource extends BaseServerResource implements BrapiMapSer
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	public BaseResult<Map> getMapById(@PathParam("mapDbId") String mapDbId)
-		throws IOException, SQLException
+			throws IOException, SQLException
 	{
 		try (Connection conn = Database.getConnection())
 		{
 			DSLContext context = Database.getContext(conn);
 			SelectJoinStep<?> step = context.select(
-				MAPS.ID.as("mapDbId"),
-				MAPS.NAME.as("mapName"),
-				DSL.countDistinct(MAPDEFINITIONS.CHROMOSOME).as("linkageGroupCount"),
-				DSL.count(MAPDEFINITIONS.MARKER_ID).as("markerCount"),
-				DSL.val("Genetic").as("type"),
-				MAPS.CREATED_ON.as("publishedDate")
-			)
+													MAPS.ID.as("mapDbId"),
+													MAPS.NAME.as("mapName"),
+													DSL.countDistinct(MAPDEFINITIONS.CHROMOSOME).as("linkageGroupCount"),
+													DSL.count(MAPDEFINITIONS.MARKER_ID).as("markerCount"),
+													DSL.val("Genetic").as("type"),
+													MAPS.CREATED_ON.as("publishedDate")
+											)
 											.hint("SQL_CALC_FOUND_ROWS")
 											.from(MAPS)
 											.leftJoin(MAPDEFINITIONS).on(MAPDEFINITIONS.MAP_ID.eq(MAPS.ID));
@@ -140,16 +137,16 @@ public class MapServerResource extends BaseServerResource implements BrapiMapSer
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	public BaseResult<ArrayResult<LinkageGroup>> getMapByIdLinkageGroups(@PathParam("mapDbId") String mapDbId)
-		throws IOException, SQLException
+			throws IOException, SQLException
 	{
 		try (Connection conn = Database.getConnection())
 		{
 			DSLContext context = Database.getContext(conn);
 			SelectJoinStep<?> step = context.select(
-				MAPDEFINITIONS.CHROMOSOME.as("linkageGroupName"),
-				DSL.count(MAPDEFINITIONS.MARKER_ID).as("markerCount"),
-				DSL.max(MAPDEFINITIONS.DEFINITION_START)
-			)
+													MAPDEFINITIONS.CHROMOSOME.as("linkageGroupName"),
+													DSL.count(MAPDEFINITIONS.MARKER_ID).as("markerCount"),
+													DSL.max(MAPDEFINITIONS.DEFINITION_START)
+											)
 											.hint("SQL_CALC_FOUND_ROWS")
 											.from(MAPS)
 											.leftJoin(MAPDEFINITIONS).on(MAPDEFINITIONS.MAP_ID.eq(MAPS.ID));

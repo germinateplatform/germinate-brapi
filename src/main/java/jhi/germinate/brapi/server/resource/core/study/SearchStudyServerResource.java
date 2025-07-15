@@ -1,8 +1,8 @@
 package jhi.germinate.brapi.server.resource.core.study;
 
+import jakarta.annotation.security.PermitAll;
 import jhi.germinate.server.*;
-import jhi.germinate.server.resource.datasets.DatasetTableResource;
-import jhi.germinate.server.util.CollectionUtils;
+import jhi.germinate.server.util.*;
 import org.jooq.*;
 import org.jooq.impl.DSL;
 import uk.ac.hutton.ics.brapi.resource.base.*;
@@ -25,6 +25,9 @@ import static jhi.germinate.server.database.codegen.tables.ViewTableDatasets.*;
 public class SearchStudyServerResource extends StudyBaseResource implements BrapiSearchStudyServerResource
 {
 	@POST
+	@Secured
+	@PermitAll
+	@NeedsDatasets
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	public Response postStudySearch(StudySearch search)

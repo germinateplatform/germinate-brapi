@@ -29,6 +29,7 @@ public class StudyServerResource extends StudyBaseResource implements BrapiStudy
 	@GET
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
+	@NeedsDatasets
 	@Secured
 	@PermitAll
 	public BaseResult<ArrayResult<Study>> getStudies(@QueryParam("studyType") String studyType,
@@ -50,8 +51,7 @@ public class StudyServerResource extends StudyBaseResource implements BrapiStudy
 													 @QueryParam("externalReferenceSource") String externalReferenceSource)
 		throws SQLException, IOException
 	{
-		AuthenticationFilter.UserDetails userDetails = (AuthenticationFilter.UserDetails) securityContext.getUserPrincipal();
-		List<Integer> datasetIds = DatasetTableResource.getDatasetIdsForUser(req, userDetails, null);
+		List<Integer> datasetIds = AuthorizationFilter.getDatasetIds(req, null, true);
 
 		try (Connection conn = Database.getConnection())
 		{
@@ -101,6 +101,7 @@ public class StudyServerResource extends StudyBaseResource implements BrapiStudy
 	@Path("/{studyDbId}")
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
+	@NeedsDatasets
 	@Secured
 	@PermitAll
 	public BaseResult<Study> getStudyById(@PathParam("studyDbId") String studyDbId)

@@ -1,10 +1,8 @@
 package jhi.germinate.brapi.server.resource.core.trial;
 
 import jhi.germinate.brapi.server.util.DateUtils;
-import jhi.germinate.resource.ViewTableExperiments;
-import jhi.germinate.server.AuthenticationFilter;
+import jhi.germinate.server.*;
 import jhi.germinate.server.database.codegen.tables.pojos.Experiments;
-import jhi.germinate.server.resource.datasets.DatasetTableResource;
 import jhi.germinate.server.util.StringUtils;
 import org.jooq.*;
 import org.jooq.impl.DSL;
@@ -29,8 +27,7 @@ public abstract class TrialBaseServerResource extends BaseServerResource
 	protected List<Trial> getTrials(DSLContext context, List<Condition> conditions)
 		throws SQLException
 	{
-		AuthenticationFilter.UserDetails userDetails = (AuthenticationFilter.UserDetails) securityContext.getUserPrincipal();
-		List<Integer> datasetIds = DatasetTableResource.getDatasetIdsForUser(req, userDetails, null);
+		List<Integer> datasetIds = AuthorizationFilter.getDatasetIds(req, null, true);
 
 		Map<Integer, List<Contact>> collaborators = new HashMap<>();
 		context.select()

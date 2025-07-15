@@ -7,7 +7,6 @@ import jhi.germinate.resource.enums.UserType;
 import jhi.germinate.server.*;
 import jhi.germinate.server.database.codegen.tables.pojos.Trialsetup;
 import jhi.germinate.server.database.codegen.tables.records.TrialsetupRecord;
-import jhi.germinate.server.resource.datasets.DatasetTableResource;
 import jhi.germinate.server.util.*;
 import org.jooq.*;
 import uk.ac.hutton.ics.brapi.resource.base.*;
@@ -26,6 +25,7 @@ public class ObservationUnitServerResource extends ObservationUnitBaseServerReso
 	@GET
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
+	@NeedsDatasets
 	@Secured
 	@PermitAll
 	public BaseResult<ArrayResult<ObservationUnit>> getObservationUnits(@QueryParam("observationUnitDbId") String observationUnitDbId,
@@ -89,6 +89,7 @@ public class ObservationUnitServerResource extends ObservationUnitBaseServerReso
 	}
 
 	@POST
+	@NeedsDatasets
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	@Secured(UserType.DATA_CURATOR)
@@ -103,8 +104,7 @@ public class ObservationUnitServerResource extends ObservationUnitBaseServerReso
 		}
 
 		// Check that all requested study ids are valid and the user has permissions
-		AuthenticationFilter.UserDetails userDetails = (AuthenticationFilter.UserDetails) securityContext.getUserPrincipal();
-		List<Integer> datasetIds = DatasetTableResource.getDatasetIdsForUser(req, userDetails, "trials");
+		List<Integer> datasetIds = AuthorizationFilter.getDatasetIds(req, "trials", true);
 		Set<Integer> studyDbId = new HashSet<>();
 
 		for (ObservationUnit ou : newObservationUnits)

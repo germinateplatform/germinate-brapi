@@ -29,6 +29,7 @@ public class SearchObservationServerResource extends ObservationBaseServerResour
 {
 	@Override
 	@POST
+	@NeedsDatasets
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	public Response postObservationSearch(ObservationSearch search)
@@ -60,6 +61,7 @@ public class SearchObservationServerResource extends ObservationBaseServerResour
 
 	@Override
 	@GET
+	@Path("/{searchResultsDbId}")
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	public BaseResult<ArrayResult<Observation>> getObservationSearchAsync(@PathParam("searchResultsDbId") String searchResultsDbId)

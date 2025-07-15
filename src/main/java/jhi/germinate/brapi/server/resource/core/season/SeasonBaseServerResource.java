@@ -1,7 +1,6 @@
 package jhi.germinate.brapi.server.resource.core.season;
 
-import jhi.germinate.server.AuthenticationFilter;
-import jhi.germinate.server.resource.datasets.DatasetTableResource;
+import jhi.germinate.server.*;
 import org.jooq.*;
 import org.jooq.impl.DSL;
 
@@ -22,8 +21,7 @@ public abstract class SeasonBaseServerResource extends BaseServerResource
 	protected List<Season> getSeasons(DSLContext context, List<Condition> conditions)
 		throws SQLException
 	{
-		AuthenticationFilter.UserDetails userDetails = (AuthenticationFilter.UserDetails) securityContext.getUserPrincipal();
-		List<Integer> datasetIds = DatasetTableResource.getDatasetIdsForUser(req, userDetails, null);
+		List<Integer> datasetIds = AuthorizationFilter.getDatasetIds(req, null, true);
 
 		SelectConditionStep<?> step = context.selectDistinct(DSL.year(DATASETS.DATE_START))
 											 .hint("SQL_CALC_FOUND_ROWS")
