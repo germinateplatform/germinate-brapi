@@ -17,6 +17,7 @@ import java.sql.*;
 import java.util.*;
 
 import static jhi.germinate.server.database.codegen.tables.Datasets.*;
+import static jhi.germinate.server.database.codegen.tables.Germinatebase.GERMINATEBASE;
 
 @Path("brapi/v2/files/genotypes/{datasetId}")
 @Secured
@@ -55,9 +56,13 @@ public class GenotypeFileServerResource extends FileServerResource
 				return null;
 			}
 
+			// Get germplasm name mapping
+			Map<String, String> germplasmNameMapping = new HashMap<>();
+			context.select(GERMINATEBASE.NAME, GERMINATEBASE.DISPLAY_NAME).from(GERMINATEBASE).forEach(g -> germplasmNameMapping.put(g.get(GERMINATEBASE.NAME), StringUtils.orElse(g.get(GERMINATEBASE.DISPLAY_NAME), g.get(GERMINATEBASE.NAME))));
+
 			File resultFile = createTempFile(null, "genotypes-" + ds.getId(), ".txt", true);
 
-			Hdf5ToFJTabbedConverter converter = new Hdf5ToFJTabbedConverter(new File(Brapi.BRAPI.hdf5BaseFolder, ds.getSourceFile()).toPath(), null, null, resultFile.toPath(), false);
+			Hdf5ToFJTabbedConverter converter = new Hdf5ToFJTabbedConverter(new File(Brapi.BRAPI.hdf5BaseFolder, ds.getSourceFile()).toPath(), null, null, germplasmNameMapping, resultFile.toPath(), false);
 			// TODO: Generate header links
 			String clientBase = Brapi.getServerBase(req);
 

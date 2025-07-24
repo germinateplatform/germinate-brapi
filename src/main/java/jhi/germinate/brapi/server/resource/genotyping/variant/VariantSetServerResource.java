@@ -252,6 +252,7 @@ public class VariantSetServerResource extends BaseServerResource implements Brap
 
 	@Override
 	@GET
+	@NeedsDatasets
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	@Path("/{variantSetDbId}/variants")
