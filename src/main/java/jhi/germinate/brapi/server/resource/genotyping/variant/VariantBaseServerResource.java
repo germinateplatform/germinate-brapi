@@ -1,18 +1,17 @@
 package jhi.germinate.brapi.server.resource.genotyping.variant;
 
-import jhi.germinate.server.*;
+import jakarta.servlet.http.HttpServletRequest;
+import jhi.germinate.server.AuthorizationFilter;
 import jhi.germinate.server.util.CollectionUtils;
 import org.jooq.*;
+import uk.ac.hutton.ics.brapi.resource.base.*;
 import uk.ac.hutton.ics.brapi.resource.genotyping.variant.Variant;
 
-import jakarta.servlet.http.*;
-
-import java.sql.*;
-import java.text.SimpleDateFormat;
+import java.sql.SQLException;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static jhi.germinate.server.database.codegen.tables.Datasetmembers.*;
+import static jhi.germinate.server.database.codegen.tables.Datasetmembers.DATASETMEMBERS;
 import static jhi.germinate.server.database.codegen.tables.Datasets.DATASETS;
 import static jhi.germinate.server.database.codegen.tables.Markers.MARKERS;
 import static jhi.germinate.server.database.codegen.tables.Markertypes.MARKERTYPES;
@@ -20,9 +19,7 @@ import static jhi.germinate.server.database.codegen.tables.Synonyms.SYNONYMS;
 
 public interface VariantBaseServerResource
 {
-	SimpleDateFormat SDF = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-
-	default List<Variant> getVariantsInternal(DSLContext context, List<Condition> conditions, int page, int pageSize, HttpServletRequest req)
+	default BaseResult<ArrayResult<Variant>> getVariantsInternal(DSLContext context, List<Condition> conditions, int page, int pageSize, HttpServletRequest req)
 			throws SQLException
 	{
 		List<Integer> datasetIds = AuthorizationFilter.getDatasetIds(req, "genotype", true);
@@ -44,27 +41,32 @@ public interface VariantBaseServerResource
 				step.and(condition);
 		}
 
-		return step.limit(pageSize)
-				   .offset(pageSize * page)
-				   .stream()
-				   .map(m -> {
-					   Variant result = new Variant()
-							   .setVariantDbId(m.get(DATASETMEMBERS.DATASET_ID) + "-" + m.get(MARKERS.ID))
-							   .setCreated(m.get(MARKERS.CREATED_ON, String.class))
-							   .setUpdated(m.get(MARKERS.UPDATED_ON, String.class))
-							   .setVariantType(m.get(MARKERTYPES.DESCRIPTION));
+		List<Variant> variants = step.limit(pageSize)
+									 .offset(pageSize * page)
+									 .stream()
+									 .map(m -> {
+										 Variant result = new Variant()
+												 .setVariantDbId(m.get(DATASETMEMBERS.DATASET_ID) + "-" + m.get(MARKERS.ID))
+												 .setCreated(m.get(MARKERS.CREATED_ON, String.class))
+												 .setUpdated(m.get(MARKERS.UPDATED_ON, String.class))
+												 .setVariantType(m.get(MARKERTYPES.DESCRIPTION));
 
-					   List<String> names = new ArrayList<>();
-					   names.add(m.get(MARKERS.MARKER_NAME));
+										 List<String> names = new ArrayList<>();
+										 names.add(m.get(MARKERS.MARKER_NAME));
 
-					   if (m.get(SYNONYMS.SYNONYMS_) != null)
-						   Collections.addAll(names, m.get(SYNONYMS.SYNONYMS_));
+										 if (m.get(SYNONYMS.SYNONYMS_) != null)
+											 Collections.addAll(names, m.get(SYNONYMS.SYNONYMS_));
 
-					   result.setVariantNames(names);
-					   result.setVariantSetDbId(Collections.singletonList(Integer.toString(m.get(DATASETMEMBERS.DATASET_ID))));
+										 result.setVariantNames(names);
+										 result.setVariantSetDbId(Collections.singletonList(Integer.toString(m.get(DATASETMEMBERS.DATASET_ID))));
 
-					   return result;
-				   })
-				   .collect(Collectors.toList());
+										 return result;
+									 })
+									 .collect(Collectors.toList());
+
+		long totalCount = context.fetchOne("SELECT FOUND_ROWS()").into(Long.class);
+
+		return new BaseResult<>(new ArrayResult<Variant>()
+				.setData(variants), page, pageSize, totalCount);
 	}
 }

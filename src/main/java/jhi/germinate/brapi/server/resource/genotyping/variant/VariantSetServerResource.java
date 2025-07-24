@@ -1,10 +1,12 @@
 package jhi.germinate.brapi.server.resource.genotyping.variant;
 
+import jakarta.annotation.security.PermitAll;
+import jakarta.ws.rs.*;
+import jakarta.ws.rs.core.*;
 import jhi.germinate.brapi.server.Brapi;
 import jhi.germinate.brapi.server.util.*;
 import jhi.germinate.server.*;
 import jhi.germinate.server.database.codegen.tables.records.DatasetsRecord;
-import jhi.germinate.server.resource.datasets.DatasetTableResource;
 import jhi.germinate.server.util.*;
 import org.jooq.*;
 import org.jooq.impl.DSL;
@@ -15,25 +17,21 @@ import uk.ac.hutton.ics.brapi.resource.genotyping.variant.Variant;
 import uk.ac.hutton.ics.brapi.server.base.BaseServerResource;
 import uk.ac.hutton.ics.brapi.server.genotyping.variant.BrapiVariantSetServerResource;
 
-import jakarta.annotation.security.PermitAll;
-import jakarta.ws.rs.*;
-import jakarta.ws.rs.core.*;
-
+import java.io.*;
 import java.io.File;
-import java.io.IOException;
 import java.sql.*;
 import java.util.*;
 import java.util.stream.*;
 
-import static jhi.germinate.server.database.codegen.tables.Datasetmembers.*;
-import static jhi.germinate.server.database.codegen.tables.Datasets.*;
-import static jhi.germinate.server.database.codegen.tables.Germinatebase.*;
-import static jhi.germinate.server.database.codegen.tables.Markers.*;
+import static jhi.germinate.server.database.codegen.tables.Datasetmembers.DATASETMEMBERS;
+import static jhi.germinate.server.database.codegen.tables.Datasets.DATASETS;
+import static jhi.germinate.server.database.codegen.tables.Germinatebase.GERMINATEBASE;
+import static jhi.germinate.server.database.codegen.tables.Markers.MARKERS;
 
 @Path("brapi/v2/variantsets")
 @Secured
 @PermitAll
-public class VariantSetServerResource extends BaseServerResource implements BrapiVariantSetServerResource, VariantSetBaseServerResource
+public class VariantSetServerResource extends BaseServerResource implements BrapiVariantSetServerResource, VariantSetBaseServerResource, VariantBaseServerResource
 {
 	@Override
 	@GET
@@ -261,7 +259,23 @@ public class VariantSetServerResource extends BaseServerResource implements Brap
 																	 @QueryParam("variantDbId") String variantDbId)
 			throws SQLException, IOException
 	{
-		resp.sendError(Response.Status.NOT_IMPLEMENTED.getStatusCode());
-		return null;
+		try (Connection conn = Database.getConnection())
+		{
+			DSLContext context = Database.getContext(conn);
+
+			List<Condition> conditions = new ArrayList<>();
+
+			if (!StringUtils.isEmpty(variantDbId))
+				conditions.add(DSL.concat(DATASETMEMBERS.DATASET_ID, DSL.val("-"), MARKERS.ID).eq(variantDbId));
+			if (!StringUtils.isEmpty(variantSetDbId))
+				conditions.add(DATASETMEMBERS.DATASET_ID.cast(String.class).eq(variantSetDbId));
+
+			BaseResult<ArrayResult<Variant>> variants = getVariantsInternal(context, conditions, page, pageSize, req);
+
+			if (CollectionUtils.isEmpty(variants.getResult().getData()))
+				return new BaseResult<>(null, page, pageSize, 0);
+			else
+				return variants;
+		}
 	}
 }

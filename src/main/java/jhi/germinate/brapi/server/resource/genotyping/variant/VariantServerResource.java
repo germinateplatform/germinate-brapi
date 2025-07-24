@@ -1,34 +1,31 @@
 package jhi.germinate.brapi.server.resource.genotyping.variant;
 
+import jakarta.annotation.security.PermitAll;
+import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.*;
 import jhi.germinate.brapi.server.Brapi;
 import jhi.germinate.brapi.server.util.*;
 import jhi.germinate.server.*;
 import jhi.germinate.server.database.codegen.tables.records.*;
-import jhi.germinate.server.resource.datasets.DatasetTableResource;
 import jhi.germinate.server.util.*;
 import org.jooq.*;
 import org.jooq.impl.DSL;
 import uk.ac.hutton.ics.brapi.resource.base.*;
 import uk.ac.hutton.ics.brapi.resource.genotyping.call.*;
-import uk.ac.hutton.ics.brapi.resource.genotyping.variant.*;
 import uk.ac.hutton.ics.brapi.resource.genotyping.variant.Variant;
 import uk.ac.hutton.ics.brapi.server.base.BaseServerResource;
 import uk.ac.hutton.ics.brapi.server.genotyping.variant.BrapiVariantServerResource;
 
-import jakarta.annotation.security.PermitAll;
-import jakarta.ws.rs.*;
-
+import java.io.*;
 import java.io.File;
-import java.io.IOException;
 import java.sql.*;
 import java.util.*;
 import java.util.stream.*;
 
-import static jhi.germinate.server.database.codegen.tables.Datasetmembers.*;
-import static jhi.germinate.server.database.codegen.tables.Datasets.*;
-import static jhi.germinate.server.database.codegen.tables.Germinatebase.*;
-import static jhi.germinate.server.database.codegen.tables.Markers.*;
+import static jhi.germinate.server.database.codegen.tables.Datasetmembers.DATASETMEMBERS;
+import static jhi.germinate.server.database.codegen.tables.Datasets.DATASETS;
+import static jhi.germinate.server.database.codegen.tables.Germinatebase.GERMINATEBASE;
+import static jhi.germinate.server.database.codegen.tables.Markers.MARKERS;
 
 @Path("brapi/v2/variants")
 @Secured
@@ -58,12 +55,12 @@ public class VariantServerResource extends BaseServerResource implements BrapiVa
 				conditions.add(DSL.concat(DATASETMEMBERS.DATASET_ID, DSL.val("-"), MARKERS.ID).eq(variantDbId));
 			// TODO: Other parameters
 
-			List<Variant> variants = getVariantsInternal(context, conditions, page, pageSize, req);
+			BaseResult<ArrayResult<Variant>> variants = getVariantsInternal(context, conditions, page, pageSize, req);
 
-			if (CollectionUtils.isEmpty(variants))
+			if (CollectionUtils.isEmpty(variants.getResult().getData()))
 				return new BaseResult<>(null, page, pageSize, 0);
 			else
-				return new BaseResult<>(new ArrayResult<Variant>().setData(variants), page, pageSize, 1);
+				return variants;
 		}
 	}
 
@@ -79,12 +76,12 @@ public class VariantServerResource extends BaseServerResource implements BrapiVa
 		try (Connection conn = Database.getConnection())
 		{
 			DSLContext context = Database.getContext(conn);
-			List<Variant> variants = getVariantsInternal(context, Collections.singletonList(DSL.concat(DATASETMEMBERS.DATASET_ID, DSL.val("-"), MARKERS.ID).eq(variantDbId)), page, pageSize, req);
+			BaseResult<ArrayResult<Variant>> variants = getVariantsInternal(context, Collections.singletonList(DSL.concat(DATASETMEMBERS.DATASET_ID, DSL.val("-"), MARKERS.ID).eq(variantDbId)), page, pageSize, req);
 
-			if (CollectionUtils.isEmpty(variants))
+			if (CollectionUtils.isEmpty(variants.getResult().getData()))
 				return new BaseResult<>(null, page, pageSize, 0);
 			else
-				return new BaseResult<>(variants.get(0), page, pageSize, 1);
+				return new BaseResult<>(variants.getResult().getData().get(0), page, pageSize, 1);
 		}
 	}
 

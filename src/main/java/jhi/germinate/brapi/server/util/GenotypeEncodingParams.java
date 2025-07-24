@@ -37,7 +37,8 @@ public class GenotypeEncodingParams
 
 	public GenotypeEncodingParams setUnknownString(String unknownString)
 	{
-		this.unknownString = unknownString;
+		if (unknownString != null)
+			this.unknownString = unknownString;
 		return this;
 	}
 
@@ -48,7 +49,8 @@ public class GenotypeEncodingParams
 
 	public GenotypeEncodingParams setSepPhased(String sepPhased)
 	{
-		this.sepPhased = sepPhased;
+		if (sepPhased != null)
+			this.sepPhased = sepPhased;
 		return this;
 	}
 
@@ -59,7 +61,8 @@ public class GenotypeEncodingParams
 
 	public GenotypeEncodingParams setSepUnphased(String sepUnphased)
 	{
-		this.sepUnphased = sepUnphased;
+		if (sepUnphased != null)
+			this.sepUnphased = sepUnphased;
 		return this;
 	}
 
