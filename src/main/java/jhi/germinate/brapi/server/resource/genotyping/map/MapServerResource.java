@@ -1,5 +1,6 @@
 package jhi.germinate.brapi.server.resource.genotyping.map;
 
+import jakarta.ws.rs.Path;
 import jhi.germinate.server.*;
 import jhi.germinate.server.util.*;
 import org.jooq.*;

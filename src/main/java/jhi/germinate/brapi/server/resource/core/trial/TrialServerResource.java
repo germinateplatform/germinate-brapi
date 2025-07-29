@@ -1,5 +1,6 @@
 package jhi.germinate.brapi.server.resource.core.trial;
 
+import jakarta.ws.rs.Path;
 import jhi.germinate.resource.enums.UserType;
 import jhi.germinate.server.*;
 import jhi.germinate.server.resource.datasets.DatasetTableResource;

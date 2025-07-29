@@ -1,6 +1,7 @@
 package jhi.germinate.brapi.server.resource.core.study;
 
 import jakarta.annotation.security.PermitAll;
+import jakarta.ws.rs.Path;
 import jhi.germinate.server.*;
 import jhi.germinate.server.util.*;
 import org.jooq.*;

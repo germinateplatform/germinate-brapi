@@ -1,5 +1,6 @@
 package jhi.germinate.brapi.server.resource.core.list;
 
+import jakarta.ws.rs.Path;
 import jhi.germinate.server.Database;
 import jhi.germinate.server.util.Secured;
 import org.jooq.*;

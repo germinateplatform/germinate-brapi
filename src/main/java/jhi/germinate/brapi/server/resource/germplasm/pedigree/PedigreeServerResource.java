@@ -2,6 +2,7 @@ package jhi.germinate.brapi.server.resource.germplasm.pedigree;
 
 import jakarta.annotation.security.PermitAll;
 import jakarta.ws.rs.*;
+import jakarta.ws.rs.Path;
 import jakarta.ws.rs.core.*;
 import jhi.germinate.server.*;
 import jhi.germinate.server.database.codegen.enums.ViewTablePedigreesRelationshipType;

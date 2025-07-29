@@ -24,9 +24,9 @@ dependencies {
 
     implementation 'org.json:json:20250517'
 
-    implementation 'ch.systems.cisd:jhdf5:14.12.0'
+    implementation 'cisd:jhdf5:19.04.1'
 
-    implementation 'org.jooq:jooq:3.16.18'
+    implementation 'org.jooq:jooq:3.20.5'
 
     implementation 'javax.annotation:javax.annotation-api:1.3.2'
     implementation 'javax.activation:activation:1.1.1'
@@ -35,7 +35,8 @@ dependencies {
 
     // Stuff needed for debugging
     implementation 'com.mysql:mysql-connector-j:8.2.0'
-    implementation 'org.flywaydb:flyway-core:6.5.7'
+    implementation 'org.flywaydb:flyway-core:10.22.0'
+    implementation 'org.flywaydb:flyway-mysql:10.22.0'
 
     compileOnly 'jakarta.servlet:jakarta.servlet-api:6.0.0'
     implementation 'org.glassfish.jersey.inject:jersey-hk2:3.1.3'

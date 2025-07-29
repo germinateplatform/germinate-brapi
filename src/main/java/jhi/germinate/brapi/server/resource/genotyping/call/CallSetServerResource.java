@@ -2,6 +2,7 @@ package jhi.germinate.brapi.server.resource.genotyping.call;
 
 import jakarta.annotation.security.PermitAll;
 import jakarta.ws.rs.*;
+import jakarta.ws.rs.Path;
 import jakarta.ws.rs.core.*;
 import jhi.germinate.brapi.server.Brapi;
 import jhi.germinate.brapi.server.util.*;

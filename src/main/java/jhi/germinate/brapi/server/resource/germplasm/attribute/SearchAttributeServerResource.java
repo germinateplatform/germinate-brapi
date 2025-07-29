@@ -1,5 +1,6 @@
 package jhi.germinate.brapi.server.resource.germplasm.attribute;
 
+import jakarta.ws.rs.Path;
 import jhi.germinate.brapi.server.resource.core.list.ListBaseServerResource;
 import jhi.germinate.server.Database;
 import jhi.germinate.server.util.*;
