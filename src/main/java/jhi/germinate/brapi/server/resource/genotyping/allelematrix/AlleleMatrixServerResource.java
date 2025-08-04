@@ -18,7 +18,6 @@ import java.sql.SQLException;
 public class AlleleMatrixServerResource extends BaseServerResource implements BrapiAlleleMatrixServerResource
 {
 	@GET
-	@NeedsDatasets
 	@Override
 	public BaseResult<AlleleMatrix> getAlleleMatrix(@QueryParam("dimensionVariantPage") Integer dimensionVariantPage,
 											 @QueryParam("dimensionVariantPageSize") Integer dimensionVariantPageSize,

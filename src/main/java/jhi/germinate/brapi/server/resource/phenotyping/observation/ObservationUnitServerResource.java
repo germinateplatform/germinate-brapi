@@ -26,7 +26,6 @@ public class ObservationUnitServerResource extends ObservationUnitBaseServerReso
 	@GET
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
-	@NeedsDatasets
 	@Secured
 	@PermitAll
 	public BaseResult<ArrayResult<ObservationUnit>> getObservationUnits(@QueryParam("observationUnitDbId") String observationUnitDbId,
@@ -90,7 +89,6 @@ public class ObservationUnitServerResource extends ObservationUnitBaseServerReso
 	}
 
 	@POST
-	@NeedsDatasets
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	@Secured(UserType.DATA_CURATOR)
@@ -105,7 +103,7 @@ public class ObservationUnitServerResource extends ObservationUnitBaseServerReso
 		}
 
 		// Check that all requested study ids are valid and the user has permissions
-		List<Integer> datasetIds = AuthorizationFilter.getDatasetIds(req, "trials", true);
+		List<Integer> datasetIds = AuthorizationFilter.getDatasetIds(req, (AuthenticationFilter.UserDetails) securityContext.getUserPrincipal(), "trials", true);
 		Set<Integer> studyDbId = new HashSet<>();
 
 		for (ObservationUnit ou : newObservationUnits)

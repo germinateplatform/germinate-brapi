@@ -49,7 +49,6 @@ public class ObservationServerResource extends ObservationBaseServerResource imp
 
 	@Override
 	@GET
-	@NeedsDatasets
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	public BaseResult<ArrayResult<Observation>> getObservations(
@@ -82,7 +81,7 @@ public class ObservationServerResource extends ObservationBaseServerResource imp
 			DSLContext context = Database.getContext(conn);
 			List<Condition> conditions = new ArrayList<>();
 
-			List<String> requestedIds = AuthorizationFilter.restrictDatasetIds(req, "trials", studyDbId, true).stream().map(Object::toString).collect(Collectors.toList());
+			List<String> requestedIds = AuthorizationFilter.restrictDatasetIds(req, (AuthenticationFilter.UserDetails) securityContext.getUserPrincipal(), "trials", studyDbId, true).stream().map(Object::toString).collect(Collectors.toList());
 
 			conditions.add(DATASETS.ID.in(requestedIds));
 			addCondition(conditions, DATASETS.EXPERIMENT_ID, trialDbId);
@@ -95,7 +94,6 @@ public class ObservationServerResource extends ObservationBaseServerResource imp
 
 	@Override
 	@POST
-	@NeedsDatasets
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	public BaseResult<ArrayResult<Observation>> postObservations(List<Observation> newObservations)
@@ -114,7 +112,7 @@ public class ObservationServerResource extends ObservationBaseServerResource imp
 		Set<Integer> studyDbIds = new HashSet<>();
 
 		// Check that all requested study ids are valid and the user has permissions
-		List<Integer> datasetIds = AuthorizationFilter.getDatasetIds(req, "trials", true);
+		List<Integer> datasetIds = AuthorizationFilter.getDatasetIds(req, (AuthenticationFilter.UserDetails) securityContext.getUserPrincipal(), "trials", true);
 
 		for (Observation n : newObservations)
 		{
@@ -358,7 +356,6 @@ public class ObservationServerResource extends ObservationBaseServerResource imp
 
 	@Override
 	@PUT
-	@NeedsDatasets
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	public BaseResult<ArrayResult<Observation>> putObservations(Map<String, Observation> observations)
@@ -371,7 +368,6 @@ public class ObservationServerResource extends ObservationBaseServerResource imp
 	@Override
 	@Path("/table")
 	@GET
-	@NeedsDatasets
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces({MediaType.APPLICATION_JSON, "text/csv", "text/tab-separated-values"})
 	public Response getObservationTable(

@@ -17,10 +17,10 @@ import static jhi.germinate.server.database.codegen.tables.Datasets.*;
 
 public interface VariantSetBaseServerResource
 {
-	default List<VariantSet> getVariantSets(DSLContext context, List<Condition> conditions, int page, int pageSize, HttpServletRequest req)
+	default List<VariantSet> getVariantSets(DSLContext context, List<Condition> conditions, int page, int pageSize, HttpServletRequest req, AuthenticationFilter.UserDetails userDetails)
 			throws SQLException
 	{
-		List<Integer> datasetIds = AuthorizationFilter.getDatasetIds(req, "genotype", true);
+		List<Integer> datasetIds = AuthorizationFilter.getDatasetIds(req, userDetails, "genotype", true);
 
 		SelectConditionStep<?> step = context.select(
 													 DATASETS.ID.as("studyDbId"),

@@ -43,7 +43,6 @@ public class GermplasmServerResource extends GermplasmBaseServerResource impleme
 	@GET
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
-	@NeedsDatasets
 	@Secured
 	@PermitAll
 	public BaseResult<ArrayResult<Germplasm>> getGermplasm(@QueryParam("accessionNumber") String accessionNumber,
@@ -104,7 +103,6 @@ public class GermplasmServerResource extends GermplasmBaseServerResource impleme
 	@POST
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
-	@NeedsDatasets
 	@Secured(UserType.DATA_CURATOR)
 	public BaseResult<ArrayResult<Germplasm>> postGermplasm(Germplasm[] newGermplasm)
 		throws IOException, SQLException
@@ -138,7 +136,6 @@ public class GermplasmServerResource extends GermplasmBaseServerResource impleme
 	@Path("/{germplasmDbId}")
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
-	@NeedsDatasets
 	@Secured
 	@PermitAll
 	public BaseResult<Germplasm> getGermplasmById(@PathParam("germplasmDbId") String germplasmDbId)
@@ -156,7 +153,6 @@ public class GermplasmServerResource extends GermplasmBaseServerResource impleme
 
 	@PUT
 	@Path("/{germplasmDbId}")
-	@NeedsDatasets
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	@Secured(UserType.DATA_CURATOR)
@@ -187,7 +183,6 @@ public class GermplasmServerResource extends GermplasmBaseServerResource impleme
 	@Path("/{germplasmDbId}/mcpd")
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
-	@NeedsDatasets
 	@Secured
 	@PermitAll
 	public BaseResult<Mcpd> getGermplasmMcpd(@PathParam("germplasmDbId") String germplasmDbId)
@@ -199,7 +194,7 @@ public class GermplasmServerResource extends GermplasmBaseServerResource impleme
 			return null;
 		}
 
-		List<Integer> datasetIds = AuthorizationFilter.getDatasetIds(req, "pedigree", true);
+		List<Integer> datasetIds = AuthorizationFilter.getDatasetIds(req, (AuthenticationFilter.UserDetails) securityContext.getUserPrincipal(), "pedigree", true);
 
 		try (Connection conn = Database.getConnection())
 		{

@@ -160,7 +160,6 @@ public class ObservationVariableServerResource extends ObservationVariableBaseSe
 	@GET
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
-	@NeedsDatasets
 	@Secured
 	@PermitAll
 	public BaseResult<ArrayResult<ObservationVariable>> getObservationVariables(
@@ -186,7 +185,7 @@ public class ObservationVariableServerResource extends ObservationVariableBaseSe
 			@QueryParam("externalReferenceSource") String externalReferenceSource)
 			throws IOException, SQLException
 	{
-		List<Integer> datasetIds = AuthorizationFilter.getDatasetIds(req, "trials", true);
+		List<Integer> datasetIds = AuthorizationFilter.getDatasetIds(req, (AuthenticationFilter.UserDetails) securityContext.getUserPrincipal(), "trials", true);
 
 		try (Connection conn = Database.getConnection())
 		{

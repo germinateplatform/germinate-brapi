@@ -27,8 +27,7 @@ public abstract class StudyBaseResource extends BaseServerResource
 	{
 		Map<Integer, List<Contact>> collaborators = new HashMap<>();
 
-		AuthenticationFilter.UserDetails userDetails = (AuthenticationFilter.UserDetails) securityContext.getUserPrincipal();
-		List<Integer> datasetIds = AuthorizationFilter.getDatasetIds(req, null, true);
+		List<Integer> datasetIds = AuthorizationFilter.getDatasetIds(req, (AuthenticationFilter.UserDetails) securityContext.getUserPrincipal(), null, true);
 
 		context.selectFrom(VIEW_TABLE_COLLABORATORS)
 			   .forEach(r -> {

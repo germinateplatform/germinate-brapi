@@ -30,7 +30,6 @@ public class SearchObservationServerResource extends ObservationBaseServerResour
 {
 	@Override
 	@POST
-	@NeedsDatasets
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	public Response postObservationSearch(ObservationSearch search)

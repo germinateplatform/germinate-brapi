@@ -28,7 +28,6 @@ public class SearchStudyServerResource extends StudyBaseResource implements Brap
 	@POST
 	@Secured
 	@PermitAll
-	@NeedsDatasets
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	public Response postStudySearch(StudySearch search)

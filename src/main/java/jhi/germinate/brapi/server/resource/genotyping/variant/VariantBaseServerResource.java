@@ -1,7 +1,7 @@
 package jhi.germinate.brapi.server.resource.genotyping.variant;
 
 import jakarta.servlet.http.HttpServletRequest;
-import jhi.germinate.server.AuthorizationFilter;
+import jhi.germinate.server.*;
 import jhi.germinate.server.util.CollectionUtils;
 import org.jooq.*;
 import uk.ac.hutton.ics.brapi.resource.base.*;
@@ -19,10 +19,10 @@ import static jhi.germinate.server.database.codegen.tables.Synonyms.SYNONYMS;
 
 public interface VariantBaseServerResource
 {
-	default BaseResult<ArrayResult<Variant>> getVariantsInternal(DSLContext context, List<Condition> conditions, int page, int pageSize, HttpServletRequest req)
+	default BaseResult<ArrayResult<Variant>> getVariantsInternal(DSLContext context, List<Condition> conditions, int page, int pageSize, HttpServletRequest req, AuthenticationFilter.UserDetails userDetails)
 			throws SQLException
 	{
-		List<Integer> datasetIds = AuthorizationFilter.getDatasetIds(req, "genotype", true);
+		List<Integer> datasetIds = AuthorizationFilter.getDatasetIds(req, userDetails, "genotype", true);
 
 		SelectConditionStep<?> step = context.select()
 											 .hint("SQL_CALC_FOUND_ROWS")

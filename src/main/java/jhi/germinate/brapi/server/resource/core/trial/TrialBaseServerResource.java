@@ -27,7 +27,7 @@ public abstract class TrialBaseServerResource extends BaseServerResource
 	protected List<Trial> getTrials(DSLContext context, List<Condition> conditions)
 		throws SQLException
 	{
-		List<Integer> datasetIds = AuthorizationFilter.getDatasetIds(req, null, true);
+		List<Integer> datasetIds = AuthorizationFilter.getDatasetIds(req, (AuthenticationFilter.UserDetails) securityContext.getUserPrincipal(), null, true);
 
 		Map<Integer, List<Contact>> collaborators = new HashMap<>();
 		context.select()

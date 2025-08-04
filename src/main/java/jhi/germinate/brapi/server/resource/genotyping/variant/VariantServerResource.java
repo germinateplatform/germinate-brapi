@@ -35,7 +35,6 @@ public class VariantServerResource extends BaseServerResource implements BrapiVa
 {
 	@Override
 	@GET
-	@NeedsDatasets
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	public BaseResult<ArrayResult<Variant>> getVariants(@QueryParam("variantDbId") String variantDbId,
@@ -56,7 +55,7 @@ public class VariantServerResource extends BaseServerResource implements BrapiVa
 				conditions.add(DSL.concat(DATASETMEMBERS.DATASET_ID, DSL.val("-"), MARKERS.ID).eq(variantDbId));
 			// TODO: Other parameters
 
-			BaseResult<ArrayResult<Variant>> variants = getVariantsInternal(context, conditions, page, pageSize, req);
+			BaseResult<ArrayResult<Variant>> variants = getVariantsInternal(context, conditions, page, pageSize, req, (AuthenticationFilter.UserDetails) securityContext.getUserPrincipal());
 
 			if (CollectionUtils.isEmpty(variants.getResult().getData()))
 				return new BaseResult<>(null, page, pageSize, 0);
@@ -67,7 +66,6 @@ public class VariantServerResource extends BaseServerResource implements BrapiVa
 
 	@Override
 	@GET
-	@NeedsDatasets
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	@Path("/{variantDbId}")
@@ -77,7 +75,7 @@ public class VariantServerResource extends BaseServerResource implements BrapiVa
 		try (Connection conn = Database.getConnection())
 		{
 			DSLContext context = Database.getContext(conn);
-			BaseResult<ArrayResult<Variant>> variants = getVariantsInternal(context, Collections.singletonList(DSL.concat(DATASETMEMBERS.DATASET_ID, DSL.val("-"), MARKERS.ID).eq(variantDbId)), page, pageSize, req);
+			BaseResult<ArrayResult<Variant>> variants = getVariantsInternal(context, Collections.singletonList(DSL.concat(DATASETMEMBERS.DATASET_ID, DSL.val("-"), MARKERS.ID).eq(variantDbId)), page, pageSize, req, (AuthenticationFilter.UserDetails) securityContext.getUserPrincipal());
 
 			if (CollectionUtils.isEmpty(variants.getResult().getData()))
 				return new BaseResult<>(null, page, pageSize, 0);
@@ -87,7 +85,6 @@ public class VariantServerResource extends BaseServerResource implements BrapiVa
 	}
 
 	@Override
-	@NeedsDatasets
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	@Path("/{variantDbId}/calls")
@@ -104,7 +101,7 @@ public class VariantServerResource extends BaseServerResource implements BrapiVa
 			return null;
 		}
 
-		List<Integer> datasetIds = AuthorizationFilter.getDatasetIds(req, "genotype", true);
+		List<Integer> datasetIds = AuthorizationFilter.getDatasetIds(req, (AuthenticationFilter.UserDetails) securityContext.getUserPrincipal(), "genotype", true);
 
 		try (Connection conn = Database.getConnection())
 		{

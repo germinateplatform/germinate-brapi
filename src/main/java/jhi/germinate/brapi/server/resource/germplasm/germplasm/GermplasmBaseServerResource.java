@@ -280,7 +280,7 @@ public abstract class GermplasmBaseServerResource extends BaseServerResource
 	protected BaseResult<ArrayResult<Germplasm>> getGermplasm(DSLContext context, List<Condition> conditions)
 		throws SQLException
 	{
-		List<Integer> datasetIds = AuthorizationFilter.getDatasetIds(req, "pedigree", true);
+		List<Integer> datasetIds = AuthorizationFilter.getDatasetIds(req, (AuthenticationFilter.UserDetails) securityContext.getUserPrincipal(), "pedigree", true);
 
 		SelectJoinStep<?> step = context.select(
 											GERMINATEBASE.NAME.as("accessionNumber"),

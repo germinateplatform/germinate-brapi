@@ -32,7 +32,6 @@ import static jhi.germinate.server.database.codegen.tables.Markers.MARKERS;
 public class CallSetServerResource extends CallSetBaseServerResource implements BrapiCallSetServerResource
 {
 	@GET
-	@NeedsDatasets
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	public BaseResult<ArrayResult<CallSet>> getCallsets(@QueryParam("callSetDbId") String callSetDbId,
@@ -44,7 +43,7 @@ public class CallSetServerResource extends CallSetBaseServerResource implements 
 														@QueryParam("externalReferenceSource") String externalReferenceSource)
 			throws IOException, SQLException
 	{
-		List<Integer> datasetIds = AuthorizationFilter.restrictDatasetIds(req, "genotype", variantSetDbId, true);
+		List<Integer> datasetIds = AuthorizationFilter.restrictDatasetIds(req, (AuthenticationFilter.UserDetails) securityContext.getUserPrincipal(), "genotype", variantSetDbId, true);
 
 		try (Connection conn = Database.getConnection())
 		{
@@ -69,7 +68,6 @@ public class CallSetServerResource extends CallSetBaseServerResource implements 
 
 	@GET
 	@Path("/{callSetDbId}")
-	@NeedsDatasets
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	public BaseResult<CallSet> getCallSetById(@PathParam("callSetDbId") String callSetDbId)
@@ -90,7 +88,6 @@ public class CallSetServerResource extends CallSetBaseServerResource implements 
 	@Override
 	@GET
 	@Path("/{callSetDbId}/calls")
-	@NeedsDatasets
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	public BaseResult<CallResult<Call>> getCallSetByIdCalls(@PathParam("callSetDbId") String callSetDbId,
@@ -106,7 +103,7 @@ public class CallSetServerResource extends CallSetBaseServerResource implements 
 			return null;
 		}
 
-		List<Integer> datasets = AuthorizationFilter.getDatasetIds(req, "genotype", true);
+		List<Integer> datasets = AuthorizationFilter.getDatasetIds(req, (AuthenticationFilter.UserDetails) securityContext.getUserPrincipal(), "genotype", true);
 
 		try (Connection conn = Database.getConnection())
 		{

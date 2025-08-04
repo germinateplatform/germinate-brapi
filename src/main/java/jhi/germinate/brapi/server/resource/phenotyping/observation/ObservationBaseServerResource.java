@@ -26,7 +26,7 @@ public class ObservationBaseServerResource extends BaseServerResource
 	protected BaseResult<ArrayResult<Observation>> getObservation(DSLContext context, List<Condition> conditions)
 			throws SQLException
 	{
-		List<Integer> datasetIds = AuthorizationFilter.getDatasetIds(req, "trials", true);
+		List<Integer> datasetIds = AuthorizationFilter.getDatasetIds(req, (AuthenticationFilter.UserDetails) securityContext.getUserPrincipal(), "trials", true);
 
 		SelectConditionStep<?> step = context.select(DSL.asterisk())
 											 .hint("SQL_CALC_FOUND_ROWS")

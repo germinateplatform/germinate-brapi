@@ -36,7 +36,6 @@ public class VariantSetServerResource extends BaseServerResource implements Brap
 {
 	@Override
 	@GET
-	@NeedsDatasets
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	public BaseResult<ArrayResult<VariantSet>> getVariantSets(@QueryParam("variantSetDbId") String variantSetDbId,
@@ -67,7 +66,7 @@ public class VariantSetServerResource extends BaseServerResource implements Brap
 			if (!StringUtils.isEmpty(studyName))
 				conditions.add(DATASETS.NAME.cast(String.class).eq(studyName));
 
-			List<VariantSet> result = getVariantSets(context, conditions, page, pageSize, req);
+			List<VariantSet> result = getVariantSets(context, conditions, page, pageSize, req, (AuthenticationFilter.UserDetails) securityContext.getUserPrincipal());
 
 			long totalCount = context.fetchOne("SELECT FOUND_ROWS()").into(Long.class);
 			return new BaseResult<>(new ArrayResult<VariantSet>()
@@ -77,7 +76,6 @@ public class VariantSetServerResource extends BaseServerResource implements Brap
 
 	@GET
 	@Path("/{variantSetDbId}")
-	@NeedsDatasets
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	public BaseResult<VariantSet> getVariantSetById(@PathParam("variantSetDbId") String variantSetDbId)
@@ -86,7 +84,7 @@ public class VariantSetServerResource extends BaseServerResource implements Brap
 		try (Connection conn = Database.getConnection())
 		{
 			DSLContext context = Database.getContext(conn);
-			List<VariantSet> results = getVariantSets(context, Collections.singletonList(DATASETS.ID.cast(String.class).eq(variantSetDbId)), page, pageSize, req);
+			List<VariantSet> results = getVariantSets(context, Collections.singletonList(DATASETS.ID.cast(String.class).eq(variantSetDbId)), page, pageSize, req, (AuthenticationFilter.UserDetails) securityContext.getUserPrincipal());
 			VariantSet result = CollectionUtils.isEmpty(results) ? null : results.get(0);
 
 			return new BaseResult<>(result, page, pageSize, 1);
@@ -121,7 +119,6 @@ public class VariantSetServerResource extends BaseServerResource implements Brap
 
 	@Override
 	@GET
-	@NeedsDatasets
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	@Path("/{variantSetDbId}/calls")
@@ -132,7 +129,7 @@ public class VariantSetServerResource extends BaseServerResource implements Brap
 															   @QueryParam("sepUnphased") String sepUnphased)
 			throws SQLException, IOException
 	{
-		List<Integer> datasetIds = AuthorizationFilter.getDatasetIds(req, "genotype", true);
+		List<Integer> datasetIds = AuthorizationFilter.getDatasetIds(req, (AuthenticationFilter.UserDetails) securityContext.getUserPrincipal(), "genotype", true);
 
 		if (StringUtils.isEmpty(variantSetDbId))
 		{
@@ -253,7 +250,6 @@ public class VariantSetServerResource extends BaseServerResource implements Brap
 
 	@Override
 	@GET
-	@NeedsDatasets
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	@Path("/{variantSetDbId}/variants")
@@ -272,7 +268,7 @@ public class VariantSetServerResource extends BaseServerResource implements Brap
 			if (!StringUtils.isEmpty(variantSetDbId))
 				conditions.add(DATASETMEMBERS.DATASET_ID.cast(String.class).eq(variantSetDbId));
 
-			BaseResult<ArrayResult<Variant>> variants = getVariantsInternal(context, conditions, page, pageSize, req);
+			BaseResult<ArrayResult<Variant>> variants = getVariantsInternal(context, conditions, page, pageSize, req, (AuthenticationFilter.UserDetails) securityContext.getUserPrincipal());
 
 			if (CollectionUtils.isEmpty(variants.getResult().getData()))
 				return new BaseResult<>(null, page, pageSize, 0);

@@ -21,7 +21,7 @@ public abstract class SeasonBaseServerResource extends BaseServerResource
 	protected List<Season> getSeasons(DSLContext context, List<Condition> conditions)
 		throws SQLException
 	{
-		List<Integer> datasetIds = AuthorizationFilter.getDatasetIds(req, null, true);
+		List<Integer> datasetIds = AuthorizationFilter.getDatasetIds(req, (AuthenticationFilter.UserDetails) securityContext.getUserPrincipal(), null, true);
 
 		SelectConditionStep<?> step = context.selectDistinct(DSL.year(DATASETS.DATE_START))
 											 .hint("SQL_CALC_FOUND_ROWS")

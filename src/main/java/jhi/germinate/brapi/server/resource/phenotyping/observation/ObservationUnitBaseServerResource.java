@@ -25,7 +25,7 @@ public class ObservationUnitBaseServerResource extends BaseServerResource
 	protected BaseResult<ArrayResult<ObservationUnit>> getObservationUnitsBase(DSLContext context, List<Condition> conditions, boolean includeObservations)
 			throws SQLException
 	{
-		List<Integer> datasetIds = AuthorizationFilter.getDatasetIds(req, "trials", true);
+		List<Integer> datasetIds = AuthorizationFilter.getDatasetIds(req, (AuthenticationFilter.UserDetails) securityContext.getUserPrincipal(), "trials", true);
 
 		SelectConditionStep<?> step = context.select(
 													 TRIALSETUP.ID.as("observationUnitDbId"),

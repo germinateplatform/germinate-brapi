@@ -31,7 +31,6 @@ public class TrialServerResource extends TrialBaseServerResource implements Brap
 	@GET
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
-	@NeedsDatasets
 	@Secured
 	@PermitAll
 	public BaseResult<ArrayResult<Trial>> getTrials(@QueryParam("active") String active,
@@ -51,7 +50,7 @@ public class TrialServerResource extends TrialBaseServerResource implements Brap
 													@QueryParam("externalReferenceSource") String externalReferenceSource)
 		throws SQLException, IOException
 	{
-		List<Integer> datasetIds = AuthorizationFilter.getDatasetIds(req, "trials", true);
+		List<Integer> datasetIds = AuthorizationFilter.getDatasetIds(req, (AuthenticationFilter.UserDetails) securityContext.getUserPrincipal(), "trials", true);
 
 		try (Connection conn = Database.getConnection())
 		{
@@ -110,7 +109,6 @@ public class TrialServerResource extends TrialBaseServerResource implements Brap
 	@Path("/{trialsDbId}")
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
-	@NeedsDatasets
 	@Secured
 	@PermitAll
 	public BaseResult<Trial> getTrialById(@PathParam("trialsDbId") String trialsDbId)

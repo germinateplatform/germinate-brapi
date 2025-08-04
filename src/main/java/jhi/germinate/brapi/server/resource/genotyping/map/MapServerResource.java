@@ -30,7 +30,6 @@ public class MapServerResource extends BaseServerResource implements BrapiMapSer
 {
 	@Override
 	@GET
-	@NeedsDatasets
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	public BaseResult<ArrayResult<Map>> getMaps(@QueryParam("mapDbId") String mapDbId,
@@ -43,7 +42,7 @@ public class MapServerResource extends BaseServerResource implements BrapiMapSer
 												@QueryParam("studyDbId") String studyDbId)
 			throws IOException, SQLException
 	{
-		List<Integer> datasetIds = AuthorizationFilter.restrictDatasetIds(req, "genotype", studyDbId, true);
+		List<Integer> datasetIds = AuthorizationFilter.restrictDatasetIds(req, (AuthenticationFilter.UserDetails) securityContext.getUserPrincipal(), "genotype", studyDbId, true);
 
 		try (Connection conn = Database.getConnection())
 		{

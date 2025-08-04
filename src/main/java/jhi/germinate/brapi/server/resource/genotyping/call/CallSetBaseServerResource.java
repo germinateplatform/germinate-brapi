@@ -22,7 +22,7 @@ public abstract class CallSetBaseServerResource extends BaseServerResource
 	protected List<CallSet> getCallSets(DSLContext context, List<Condition> conditions)
 			throws SQLException
 	{
-		List<Integer> datasets = AuthorizationFilter.getDatasetIds(req, "genotype", true);
+		List<Integer> datasets = AuthorizationFilter.getDatasetIds(req, (AuthenticationFilter.UserDetails) securityContext.getUserPrincipal(), "genotype", true);
 
 		SelectConditionStep<?> step = context.select(
 													 DSL.concat(DATASETMEMBERS.DATASET_ID, DSL.val("-"), GERMINATEBASE.ID).as("callSetDbId"),

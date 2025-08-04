@@ -34,7 +34,6 @@ public class PedigreeServerResource extends BaseServerResource implements BrapiP
 	@GET
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
-	@NeedsDatasets
 	@Secured
 	@PermitAll
 	public BaseResult<ArrayResult<Pedigree>> getPedigree(@QueryParam("accessionNumber") String accessionNumber,
@@ -66,7 +65,7 @@ public class PedigreeServerResource extends BaseServerResource implements BrapiP
 		{
 			DSLContext context = Database.getContext(conn);
 
-			List<Integer> datasetIds = AuthorizationFilter.getDatasetIds(req, "pedigree", true);
+			List<Integer> datasetIds = AuthorizationFilter.getDatasetIds(req, (AuthenticationFilter.UserDetails) securityContext.getUserPrincipal(), "pedigree", true);
 
 			Map<String, Pedigree> lookup = new HashMap<>();
 			context.select(

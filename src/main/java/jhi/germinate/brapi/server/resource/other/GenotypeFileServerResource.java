@@ -28,7 +28,6 @@ public class GenotypeFileServerResource extends FileServerResource
 	private String datasetId;
 
 	@GET
-	@NeedsDatasets
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces("text/tab-separated-values")
 	public Response getGenotypeFile()
@@ -40,7 +39,7 @@ public class GenotypeFileServerResource extends FileServerResource
 			return null;
 		}
 
-		List<Integer> datasetIds = AuthorizationFilter.getDatasetIds(req, "genotype", true);
+		List<Integer> datasetIds = AuthorizationFilter.getDatasetIds(req, (AuthenticationFilter.UserDetails) securityContext.getUserPrincipal(), "genotype", true);
 
 		try (Connection conn = Database.getConnection())
 		{

@@ -27,14 +27,13 @@ import static jhi.germinate.server.database.codegen.tables.Trialsetup.TRIALSETUP
 public class SearchObservationVariableServerResource extends ObservationVariableBaseServerResource implements BrapiSearchObservationVariableServerResource
 {
 	@POST
-	@NeedsDatasets
 	@Consumes(MediaType.APPLICATION_JSON)
 	@Produces(MediaType.APPLICATION_JSON)
 	public Response postObservationVariableSearch(ObservationVariableSearch search)
 		throws SQLException, IOException
 	{
 		List<Integer> requestedIds = CollectionUtils.isEmpty(search.getStudyDbIds()) ? null : search.getStudyDbIds().stream().map(Integer::parseInt).toList();
-		List<String> datasetIds = AuthorizationFilter.restrictDatasetIds(req, "trials", requestedIds, true).stream().map(i -> Integer.toString(i)).toList();
+		List<String> datasetIds = AuthorizationFilter.restrictDatasetIds(req, (AuthenticationFilter.UserDetails) securityContext.getUserPrincipal(), "trials", requestedIds, true).stream().map(i -> Integer.toString(i)).toList();
 
 		try (Connection conn = Database.getConnection())
 		{
