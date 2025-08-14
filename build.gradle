@@ -2,8 +2,8 @@ plugins {
     id 'java'
 }
 
-group 'uk.ac.hutton.germinate.brapi'
-version '4.9.0'
+group = 'uk.ac.hutton.germinate.brapi'
+version = '4.9.0'
 
 java {
     sourceCompatibility = JavaVersion.VERSION_21
@@ -12,10 +12,10 @@ java {
 repositories {
     mavenCentral()
     maven {
-        url 'https://repo.spring.io/plugins-release/'
+        url = 'https://repo.spring.io/plugins-release/'
     }
     maven {
-        url 'https://maven.imagej.net/content/repositories/public/'
+        url = 'https://maven.imagej.net/content/repositories/public/'
     }
 }
 
