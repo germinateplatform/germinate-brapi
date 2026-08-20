@@ -54,25 +54,13 @@ public class ObservationVariableServerResource extends ObservationVariableBaseSe
 
 			for (ObservationVariable ov : newVariables)
 			{
-				PhenotypesDatatype dataType;
-
-				switch (ov.getScale().getDataType())
+				PhenotypesDatatype dataType = switch (ov.getScale().getDataType())
 				{
-					case "Date":
-						dataType = PhenotypesDatatype.date;
-						break;
-					case "Duration":
-					case "Numeric":
-						dataType = PhenotypesDatatype.numeric;
-						break;
-					case "Ordinal":
-						dataType = PhenotypesDatatype.categorical;
-						break;
-					case "Text":
-					default:
-						dataType = PhenotypesDatatype.text;
-						break;
-				}
+					case "Date" -> PhenotypesDatatype.date;
+					case "Duration", "Numeric", "Numerical" -> PhenotypesDatatype.numeric;
+					case "Ordinal" -> PhenotypesDatatype.categorical;
+					default -> PhenotypesDatatype.text;
+				};
 
 				UnitsRecord unit = ov.getScale() != null ? context.selectFrom(UNITS)
 																  .where(UNITS.UNIT_NAME.eq(ov.getScale().getScaleName()))

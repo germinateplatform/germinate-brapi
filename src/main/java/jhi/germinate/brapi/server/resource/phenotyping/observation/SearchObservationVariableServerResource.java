@@ -40,14 +40,15 @@ public class SearchObservationVariableServerResource extends ObservationVariable
 			DSLContext context = Database.getContext(conn);
 			List<Condition> conditions = new ArrayList<>();
 
-			conditions.add(DSL.exists(DSL.selectOne().from(PHENOTYPEDATA).leftJoin(TRIALSETUP).on(TRIALSETUP.ID.eq(PHENOTYPEDATA.TRIALSETUP_ID)).where(TRIALSETUP.DATASET_ID.cast(String.class).in(datasetIds)).and(PHENOTYPEDATA.PHENOTYPE_ID.eq(PHENOTYPES.ID))));
+			if (!CollectionUtils.isEmpty(requestedIds))
+				conditions.add(DSL.exists(DSL.selectOne().from(PHENOTYPEDATA).leftJoin(TRIALSETUP).on(TRIALSETUP.ID.eq(PHENOTYPEDATA.TRIALSETUP_ID)).where(TRIALSETUP.DATASET_ID.cast(String.class).in(datasetIds)).and(PHENOTYPEDATA.PHENOTYPE_ID.eq(PHENOTYPES.ID))));
 
 			if (!CollectionUtils.isEmpty(search.getObservationVariableDbIds()))
 				conditions.add(PHENOTYPES.ID.cast(String.class).in(search.getObservationVariableDbIds()));
 			if (!CollectionUtils.isEmpty(search.getObservationVariableNames()))
 				conditions.add(PHENOTYPES.NAME.in(search.getObservationVariableNames()));
 			if (!CollectionUtils.isEmpty(search.getTrialDbIds()))
-				conditions.add(DSL.exists(DSL.selectOne().from(PHENOTYPEDATA).leftJoin(TRIALSETUP).on(TRIALSETUP.ID.eq(PHENOTYPEDATA.TRIALSETUP_ID)).leftJoin(DATASETS).on(DATASETS.ID.eq(TRIALSETUP.DATASET_ID)).where(DATASETS.EXPERIMENT_ID.cast(String.class).in(search.getTrialDbIds())).and(PHENOTYPEDATA.PHENOTYPE_ID.eq(PHENOTYPES.ID))));
+				conditions.add(DSL.exists(DSL.selectOne().from(PHENOTYPEDATA).leftJoin(TRIALSETUP).on(TRIALSETUP.ID.eq(PHENOTYPEDATA.TRIALSETUP_ID)).leftJoin(DATASETS).on(DATASETS.ID.eq(TRIALSETUP.DATASET_ID)).where(TRIALSETUP.DATASET_ID.cast(String.class).in(datasetIds)).and(DATASETS.EXPERIMENT_ID.cast(String.class).in(search.getTrialDbIds())).and(PHENOTYPEDATA.PHENOTYPE_ID.eq(PHENOTYPES.ID))));
 
 			return Response.ok(getVariables(context, conditions)).build();
 		}
