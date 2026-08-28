@@ -33,7 +33,7 @@ public class TrialServerResource extends TrialBaseServerResource implements Brap
 	@Produces(MediaType.APPLICATION_JSON)
 	@Secured
 	@PermitAll
-	public BaseResult<ArrayResult<Trial>> getTrials(@QueryParam("active") String active,
+	public BaseResult<ArrayResult<Trial>> getTrials(@QueryParam("active") Boolean active,
 													@QueryParam("contactDbId") String contactDbId,
 													@QueryParam("locationDbId") String locationDbId,
 													@QueryParam("searchDateRangeStart") String searchDateRangeStart,

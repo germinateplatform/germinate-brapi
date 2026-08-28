@@ -1,61 +1,53 @@
 package jhi.germinate.brapi.server.resource.phenotyping.observation;
 
 import jhi.germinate.brapi.server.Brapi;
-import jhi.germinate.server.database.codegen.enums.PhenotypesDatatype;
+import jhi.germinate.server.database.codegen.enums.ViewTableTraitsScaleDatatype;
 import jhi.germinate.server.database.codegen.tables.pojos.ViewTableImages;
 import jhi.germinate.server.database.pojo.TraitRestrictions;
-import jhi.germinate.server.util.CollectionUtils;
-import jhi.germinate.server.util.StringUtils;
-import org.jooq.Condition;
-import org.jooq.DSLContext;
+import jhi.germinate.server.util.*;
+import org.jooq.*;
 import org.jooq.Record;
-import org.jooq.SelectOnConditionStep;
 import uk.ac.hutton.ics.brapi.resource.base.*;
-import uk.ac.hutton.ics.brapi.resource.germplasm.attribute.Category;
-import uk.ac.hutton.ics.brapi.resource.germplasm.attribute.Scale;
-import uk.ac.hutton.ics.brapi.resource.germplasm.attribute.Trait;
-import uk.ac.hutton.ics.brapi.resource.germplasm.attribute.ValidValues;
+import uk.ac.hutton.ics.brapi.resource.germplasm.attribute.*;
 import uk.ac.hutton.ics.brapi.resource.phenotyping.observation.ObservationVariable;
 import uk.ac.hutton.ics.brapi.server.base.BaseServerResource;
 
-import java.net.URI;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static jhi.germinate.server.database.codegen.tables.Phenotypecategories.PHENOTYPECATEGORIES;
-import static jhi.germinate.server.database.codegen.tables.Phenotypes.PHENOTYPES;
-import static jhi.germinate.server.database.codegen.tables.Units.UNITS;
+import static jhi.germinate.server.database.codegen.tables.Traitcategories.TRAITCATEGORIES;
 import static jhi.germinate.server.database.codegen.tables.ViewTableImages.VIEW_TABLE_IMAGES;
+import static jhi.germinate.server.database.codegen.tables.ViewTableTraits.VIEW_TABLE_TRAITS;
 
 public class ObservationVariableBaseServerResource extends BaseServerResource
 {
 	protected BaseResult<ArrayResult<ObservationVariable>> getVariables(DSLContext context, List<Condition> conditions)
 	{
 		SelectOnConditionStep<Record> step = context.select()
-													.from(PHENOTYPES)
-													.leftJoin(PHENOTYPECATEGORIES).on(PHENOTYPECATEGORIES.ID.eq(PHENOTYPES.CATEGORY_ID))
-													.leftJoin(UNITS).on(UNITS.ID.eq(PHENOTYPES.UNIT_ID));
+		                                            .from(VIEW_TABLE_TRAITS)
+		                                            .leftJoin(TRAITCATEGORIES).on(TRAITCATEGORIES.ID.eq(VIEW_TABLE_TRAITS.TRAIT_CATEGORY_ID));
 
 		if (!CollectionUtils.isEmpty(conditions))
 			conditions.forEach(c -> step.where(conditions));
 
 		List<ObservationVariable> variables = step.limit(pageSize)
-												  .offset(pageSize * page)
-												  .stream()
-												  .map(t -> {
-													  ObservationVariable variable = new ObservationVariable().setObservationVariableDbId(Integer.toString(t.get(PHENOTYPES.ID)))
-																											  .setObservationVariableName(t.get(PHENOTYPES.NAME));
+		                                          .offset(pageSize * page)
+		                                          .stream()
+		                                          .map(t -> {
+													  ObservationVariable variable = new ObservationVariable()
+															  .setObservationVariableDbId(Integer.toString(t.get(VIEW_TABLE_TRAITS.VARIABLE_ID)))
+					                                          .setObservationVariableName(t.get(VIEW_TABLE_TRAITS.VARIABLE_NAME));
 
-													  PhenotypesDatatype dataType = t.get(PHENOTYPES.DATATYPE);
-													  TraitRestrictions restrictions = t.get(PHENOTYPES.RESTRICTIONS);
-													  Integer unitId = t.get(UNITS.ID);
-													  String unitName = t.get(UNITS.UNIT_NAME);
-													  Integer categoryId = t.get(PHENOTYPECATEGORIES.ID);
-													  String categoryName = t.get(PHENOTYPECATEGORIES.NAME);
-													  Integer setSize = t.get(PHENOTYPES.SETSIZE);
-													  Boolean isTimeseries = t.get(PHENOTYPES.IS_TIMESERIES);
+													  ViewTableTraitsScaleDatatype dataType = t.get(VIEW_TABLE_TRAITS.SCALE_DATATYPE);
+													  TraitRestrictions restrictions = t.get(VIEW_TABLE_TRAITS.SCALE_RESTRICTIONS);
+													  Integer categoryId = t.get(TRAITCATEGORIES.ID);
+													  String categoryName = t.get(TRAITCATEGORIES.NAME);
+													  Integer setSize = t.get(VIEW_TABLE_TRAITS.METHOD_SET_SIZE);
+													  Boolean isTimeseries = t.get(VIEW_TABLE_TRAITS.METHOD_IS_TIMESERIES);
 
-													  Scale scale = new Scale();
+													  Scale scale = new Scale()
+															  .setScaleDbId(Integer.toString(t.get(VIEW_TABLE_TRAITS.SCALE_ID)))
+					                                          .setScaleName(t.get(VIEW_TABLE_TRAITS.SCALE_NAME));
 
 													  switch (dataType)
 													  {
@@ -71,16 +63,6 @@ public class ObservationVariableBaseServerResource extends BaseServerResource
 														  case text:
 														  default:
 															  scale.setDataType("Text");
-													  }
-
-													  if (unitId != null && !StringUtils.isEmpty(unitName))
-													  {
-														  scale.setScaleDbId(Integer.toString(unitId))
-															   .setScaleName(unitName);
-													  }
-													  else
-													  {
-														  scale.setScaleName("N/A");
 													  }
 
 													  if (restrictions != null)
@@ -109,14 +91,15 @@ public class ObservationVariableBaseServerResource extends BaseServerResource
 														  scale.setValidValues(vv);
 													  }
 
-													  List<ViewTableImages> referenceImages = context.selectFrom(VIEW_TABLE_IMAGES).where(VIEW_TABLE_IMAGES.IMAGE_REF_TABLE.eq("phenotypes"))
-																									 .and(VIEW_TABLE_IMAGES.IMAGE_IS_REFERENCE.eq(true))
-																									 .and(VIEW_TABLE_IMAGES.IMAGE_FOREIGN_ID.eq(t.get(PHENOTYPES.ID)))
-																									 .fetchInto(ViewTableImages.class);
+													  List<ViewTableImages> referenceImages = context.selectFrom(VIEW_TABLE_IMAGES).where(VIEW_TABLE_IMAGES.IMAGE_REF_TABLE.eq("variables"))
+			                                                                                         .and(VIEW_TABLE_IMAGES.IMAGE_IS_REFERENCE.eq(true))
+			                                                                                         .and(VIEW_TABLE_IMAGES.IMAGE_FOREIGN_ID.eq(t.get(VIEW_TABLE_TRAITS.VARIABLE_ID)))
+			                                                                                         .fetchInto(ViewTableImages.class);
 
-													  Trait trait = new Trait().setTraitDbId(Integer.toString(t.get(PHENOTYPES.ID)))
-																			   .setTraitName(t.get(PHENOTYPES.NAME))
-																			   .setTraitDescription(t.get(PHENOTYPES.DESCRIPTION));
+													  Trait trait = new Trait()
+															  .setTraitDbId(Integer.toString(t.get(VIEW_TABLE_TRAITS.TRAIT_ID)))
+					                                          .setTraitName(t.get(VIEW_TABLE_TRAITS.TRAIT_NAME))
+					                                          .setTraitDescription(t.get(VIEW_TABLE_TRAITS.TRAIT_DESCRIPTION));
 
 													  if (!CollectionUtils.isEmpty(referenceImages))
 													  {
@@ -124,24 +107,23 @@ public class ObservationVariableBaseServerResource extends BaseServerResource
 															  String url = Brapi.getServerBase(req) + "/api/image/" + i.getImageId() + "/src?type=database";
 															  Reference ref = new Reference();
 															  ref.setReferenceId(url)
-																 .setReferenceSource("Germinate observation variable reference image");
+					                                             .setReferenceSource("Germinate observation variable reference image");
 															  return ref;
 														  }).toList());
 													  }
 
 													  if (categoryId != null && !StringUtils.isEmpty(categoryName))
-													  {
 														  trait.setTraitClass(categoryName);
-													  }
 
 													  variable.setScale(scale);
 													  variable.setTrait(trait);
-													  variable.setAdditionalInfo(new HashMap<>());
 
+													  HashMap<String, String> additionalInfo = new HashMap<>();
 													  if (setSize != null)
 														  variable.getAdditionalInfo().put("setSize", String.valueOf(setSize));
 													  if (isTimeseries != null)
 														  variable.getAdditionalInfo().put("isTimeseries", String.valueOf(isTimeseries));
+													  variable.setAdditionalInfo(additionalInfo);
 
 													  return variable;
 												  }).collect(Collectors.toList());

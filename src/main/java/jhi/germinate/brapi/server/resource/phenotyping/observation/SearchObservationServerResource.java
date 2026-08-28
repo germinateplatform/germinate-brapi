@@ -20,8 +20,8 @@ import java.util.logging.Logger;
 import static jhi.germinate.server.database.codegen.tables.Datasets.DATASETS;
 import static jhi.germinate.server.database.codegen.tables.Germinatebase.GERMINATEBASE;
 import static jhi.germinate.server.database.codegen.tables.Phenotypedata.PHENOTYPEDATA;
-import static jhi.germinate.server.database.codegen.tables.Phenotypes.PHENOTYPES;
 import static jhi.germinate.server.database.codegen.tables.Trialsetup.TRIALSETUP;
+import static jhi.germinate.server.database.codegen.tables.Variables.VARIABLES;
 
 @Path("brapi/v2/search/observations")
 @Secured
@@ -41,17 +41,17 @@ public class SearchObservationServerResource extends ObservationBaseServerResour
 			List<Condition> conditions = new ArrayList<>();
 
 			if (!CollectionUtils.isEmpty(search.getObservationVariableDbIds()))
-				conditions.add(PHENOTYPES.ID.cast(String.class).in(search.getObservationVariableDbIds()));
+				conditions.add(VARIABLES.ID.cast(String.class).in(search.getObservationVariableDbIds()));
 			if (!CollectionUtils.isEmpty(search.getObservationVariableNames()))
-				conditions.add(PHENOTYPES.NAME.in(search.getObservationVariableNames()));
+				conditions.add(VARIABLES.NAME.in(search.getObservationVariableNames()));
 			if (!CollectionUtils.isEmpty(search.getGermplasmDbIds()))
 				conditions.add(GERMINATEBASE.ID.cast(String.class).in(search.getGermplasmDbIds()));
 			if (!CollectionUtils.isEmpty(search.getGermplasmNames()))
 				conditions.add(GERMINATEBASE.NAME.in(search.getGermplasmNames()));
 			if (!CollectionUtils.isEmpty(search.getStudyDbIds()))
-				conditions.add(DSL.exists(DSL.selectOne().from(PHENOTYPEDATA).leftJoin(TRIALSETUP).on(TRIALSETUP.ID.eq(PHENOTYPEDATA.TRIALSETUP_ID)).where(TRIALSETUP.DATASET_ID.cast(String.class).in(search.getStudyDbIds())).and(PHENOTYPEDATA.PHENOTYPE_ID.eq(PHENOTYPES.ID))));
+				conditions.add(DSL.exists(DSL.selectOne().from(PHENOTYPEDATA).leftJoin(TRIALSETUP).on(TRIALSETUP.ID.eq(PHENOTYPEDATA.TRIALSETUP_ID)).where(TRIALSETUP.DATASET_ID.cast(String.class).in(search.getStudyDbIds())).and(PHENOTYPEDATA.VARIABLE_ID.eq(VARIABLES.ID))));
 			if (!CollectionUtils.isEmpty(search.getTrialDbIds()))
-				conditions.add(DSL.exists(DSL.selectOne().from(PHENOTYPEDATA).leftJoin(TRIALSETUP).on(TRIALSETUP.ID.eq(PHENOTYPEDATA.TRIALSETUP_ID)).leftJoin(DATASETS).on(DATASETS.ID.eq(TRIALSETUP.DATASET_ID)).where(DATASETS.EXPERIMENT_ID.cast(String.class).in(search.getTrialDbIds())).and(PHENOTYPEDATA.PHENOTYPE_ID.eq(PHENOTYPES.ID))));
+				conditions.add(DSL.exists(DSL.selectOne().from(PHENOTYPEDATA).leftJoin(TRIALSETUP).on(TRIALSETUP.ID.eq(PHENOTYPEDATA.TRIALSETUP_ID)).leftJoin(DATASETS).on(DATASETS.ID.eq(TRIALSETUP.DATASET_ID)).where(DATASETS.EXPERIMENT_ID.cast(String.class).in(search.getTrialDbIds())).and(PHENOTYPEDATA.VARIABLE_ID.eq(VARIABLES.ID))));
 
 			Logger.getLogger("").info(search + " -> " + conditions);
 
