@@ -1,9 +1,8 @@
 package jhi.germinate.brapi.server.resource.phenotyping.observation;
 
 import jhi.germinate.brapi.server.Brapi;
-import jhi.germinate.server.database.codegen.enums.ViewTableTraitsScaleDatatype;
-import jhi.germinate.server.database.codegen.tables.pojos.ViewTableImages;
-import jhi.germinate.server.database.pojo.TraitRestrictions;
+import jhi.germinate.server.database.codegen.tables.pojos.*;
+import jhi.germinate.server.database.pojo.*;
 import jhi.germinate.server.util.*;
 import org.jooq.*;
 import org.jooq.Record;
@@ -24,108 +23,161 @@ public class ObservationVariableBaseServerResource extends BaseServerResource
 	protected BaseResult<ArrayResult<ObservationVariable>> getVariables(DSLContext context, List<Condition> conditions)
 	{
 		SelectOnConditionStep<Record> step = context.select()
-		                                            .from(VIEW_TABLE_TRAITS)
-		                                            .leftJoin(TRAITCATEGORIES).on(TRAITCATEGORIES.ID.eq(VIEW_TABLE_TRAITS.TRAIT_CATEGORY_ID));
+													.from(VIEW_TABLE_TRAITS)
+													.leftJoin(TRAITCATEGORIES).on(TRAITCATEGORIES.ID.eq(VIEW_TABLE_TRAITS.TRAIT_CATEGORY_ID));
 
 		if (!CollectionUtils.isEmpty(conditions))
 			conditions.forEach(c -> step.where(conditions));
 
 		List<ObservationVariable> variables = step.limit(pageSize)
-		                                          .offset(pageSize * page)
-		                                          .stream()
-		                                          .map(t -> {
-													  ObservationVariable variable = new ObservationVariable()
-															  .setObservationVariableDbId(Integer.toString(t.get(VIEW_TABLE_TRAITS.VARIABLE_ID)))
-					                                          .setObservationVariableName(t.get(VIEW_TABLE_TRAITS.VARIABLE_NAME));
+												  .offset(pageSize * page)
+												  .stream()
+												  .map(t -> {
+													  ViewTableTraits variable = t.into(ViewTableTraits.class);
 
-													  ViewTableTraitsScaleDatatype dataType = t.get(VIEW_TABLE_TRAITS.SCALE_DATATYPE);
-													  TraitRestrictions restrictions = t.get(VIEW_TABLE_TRAITS.SCALE_RESTRICTIONS);
-													  Integer categoryId = t.get(TRAITCATEGORIES.ID);
-													  String categoryName = t.get(TRAITCATEGORIES.NAME);
-													  Integer setSize = t.get(VIEW_TABLE_TRAITS.METHOD_SET_SIZE);
-													  Boolean isTimeseries = t.get(VIEW_TABLE_TRAITS.METHOD_IS_TIMESERIES);
+													  ObservationVariable result = new ObservationVariable()
+															  .setObservationVariableDbId(Integer.toString(variable.getVariableId()))
+															  .setObservationVariableName(variable.getVariableName());
 
-													  Scale scale = new Scale()
-															  .setScaleDbId(Integer.toString(t.get(VIEW_TABLE_TRAITS.SCALE_ID)))
-					                                          .setScaleName(t.get(VIEW_TABLE_TRAITS.SCALE_NAME));
+													  Scale scale = null;
 
-													  switch (dataType)
+													  if (variable.getScaleId() != null)
 													  {
-														  case date:
-															  scale.setDataType("Date");
-															  break;
-														  case numeric:
-															  scale.setDataType("Numerical");
-															  break;
-														  case categorical:
-															  scale.setDataType("Ordinal");
-															  break;
-														  case text:
-														  default:
-															  scale.setDataType("Text");
-													  }
+														  scale = new Scale()
+																  .setScaleDbId(Integer.toString(variable.getScaleId()))
+																  .setScaleName(variable.getScaleName());
 
-													  if (restrictions != null)
-													  {
-														  ValidValues vv = new ValidValues();
-
-														  if (restrictions.getCategories() != null)
+														  if (!CollectionUtils.isEmpty(variable.getScaleOntologies()))
 														  {
-															  List<Category> categories = new ArrayList<>();
-
-															  for (String[] cats : restrictions.getCategories())
-															  {
-																  for (String value : cats)
-																  {
-																	  categories.add(new Category().setValue(value).setLabel(value));
-																  }
-															  }
-
-															  vv.setCategories(categories);
+															  OntologyInfo scaleOntology = variable.getScaleOntologies()[0];
+															  scale.setOntologyReference(new OntologyReference()
+																	  .setOntologyDbId(scaleOntology.getOntologyPuid())
+																	  // TODO: Update if Germinate changes away from this at any point
+																	  .setOntologyName("Crop Ontology"));
 														  }
-														  if (restrictions.getMin() != null)
-															  vv.setMinimumValue(Integer.toString((int) Math.floor(restrictions.getMin())));
-														  if (restrictions.getMax() != null)
-															  vv.setMaximumValue(Integer.toString((int) Math.ceil(restrictions.getMax())));
 
-														  scale.setValidValues(vv);
+														  switch (variable.getScaleDatatype())
+														  {
+															  case date:
+																  scale.setDataType("Date");
+																  break;
+															  case numeric:
+																  scale.setDataType("Numerical");
+																  break;
+															  case categorical:
+																  scale.setDataType("Ordinal");
+																  break;
+															  case text:
+															  default:
+																  scale.setDataType("Text");
+														  }
+
+														  TraitRestrictions restrictions = variable.getScaleRestrictions();
+														  if (restrictions != null)
+														  {
+															  ValidValues vv = new ValidValues();
+
+															  if (restrictions.getCategories() != null)
+															  {
+																  List<Category> categories = new ArrayList<>();
+
+																  for (String[] cats : restrictions.getCategories())
+																  {
+																	  for (String value : cats)
+																	  {
+																		  categories.add(new Category().setValue(value).setLabel(value));
+																	  }
+																  }
+
+																  vv.setCategories(categories);
+															  }
+															  if (restrictions.getMin() != null)
+																  vv.setMinimumValue(Integer.toString((int) Math.floor(restrictions.getMin())));
+															  if (restrictions.getMax() != null)
+																  vv.setMaximumValue(Integer.toString((int) Math.ceil(restrictions.getMax())));
+
+															  scale.setValidValues(vv);
+														  }
 													  }
 
 													  List<ViewTableImages> referenceImages = context.selectFrom(VIEW_TABLE_IMAGES).where(VIEW_TABLE_IMAGES.IMAGE_REF_TABLE.eq("variables"))
-			                                                                                         .and(VIEW_TABLE_IMAGES.IMAGE_IS_REFERENCE.eq(true))
-			                                                                                         .and(VIEW_TABLE_IMAGES.IMAGE_FOREIGN_ID.eq(t.get(VIEW_TABLE_TRAITS.VARIABLE_ID)))
-			                                                                                         .fetchInto(ViewTableImages.class);
+																									 .and(VIEW_TABLE_IMAGES.IMAGE_IS_REFERENCE.eq(true))
+																									 .and(VIEW_TABLE_IMAGES.IMAGE_FOREIGN_ID.eq(t.get(VIEW_TABLE_TRAITS.VARIABLE_ID)))
+																									 .fetchInto(ViewTableImages.class);
 
-													  Trait trait = new Trait()
-															  .setTraitDbId(Integer.toString(t.get(VIEW_TABLE_TRAITS.TRAIT_ID)))
-					                                          .setTraitName(t.get(VIEW_TABLE_TRAITS.TRAIT_NAME))
-					                                          .setTraitDescription(t.get(VIEW_TABLE_TRAITS.TRAIT_DESCRIPTION));
+													  Trait trait = null;
 
-													  if (!CollectionUtils.isEmpty(referenceImages))
+													  if (variable.getTraitId() != null)
 													  {
-														  trait.setExternalReferences(referenceImages.stream().map(i -> {
-															  String url = Brapi.getServerBase(req) + "/api/image/" + i.getImageId() + "/src?type=database";
-															  Reference ref = new Reference();
-															  ref.setReferenceId(url)
-					                                             .setReferenceSource("Germinate observation variable reference image");
-															  return ref;
-														  }).toList());
+														  trait = new Trait()
+																  .setTraitDbId(Integer.toString(variable.getTraitId()))
+																  .setTraitName(variable.getTraitName())
+																  .setTraitDescription(variable.getTraitDescription());
+
+														  if (!CollectionUtils.isEmpty(variable.getTraitOntologies()))
+														  {
+															  OntologyInfo traitOntology = variable.getTraitOntologies()[0];
+															  trait.setOntologyReference(new OntologyReference()
+																	  .setOntologyDbId(traitOntology.getOntologyPuid())
+																	  // TODO: Update if Germinate changes away from this at any point
+																	  .setOntologyName("Crop Ontology"));
+														  }
+
+														  if (!CollectionUtils.isEmpty(referenceImages))
+														  {
+															  trait.setExternalReferences(referenceImages.stream().map(i -> {
+																  String url = Brapi.getServerBase(req) + "/api/image/" + i.getImageId() + "/src?type=database";
+																  Reference ref = new Reference();
+																  ref.setReferenceId(url)
+																	 .setReferenceSource("Germinate observation variable reference image");
+																  return ref;
+															  }).toList());
+														  }
+
+														  if (variable.getTraitCategoryId() != null && !StringUtils.isEmpty(variable.getTraitCategoryName()))
+															  trait.setTraitClass(variable.getTraitCategoryName());
 													  }
 
-													  if (categoryId != null && !StringUtils.isEmpty(categoryName))
-														  trait.setTraitClass(categoryName);
+													  Method method = null;
 
-													  variable.setScale(scale);
-													  variable.setTrait(trait);
+													  if (variable.getMethodId() != null)
+													  {
+														  method = new Method()
+																  .setMethodDbId(Integer.toString(variable.getMethodId()))
+																  .setMethodName(variable.getMethodName())
+																  .setMethodClass(variable.getMethodClass().name());
+
+														  if (!CollectionUtils.isEmpty(variable.getMethodOntologies()))
+														  {
+															  OntologyInfo methodOntology = variable.getMethodOntologies()[0];
+															  method.setOntologyReference(new OntologyReference()
+																	  .setOntologyDbId(methodOntology.getOntologyPuid())
+																	  // TODO: Update if Germinate changes away from this at any point
+																	  .setOntologyName("Crop Ontology"));
+														  }
+													  }
+
+													  result.setScale(scale);
+													  result.setTrait(trait);
+													  result.setMethod(method);
+
+													  if (!CollectionUtils.isEmpty(variable.getVariableOntologies()))
+													  {
+														  OntologyInfo variableOntology = variable.getVariableOntologies()[0];
+														  result.setOntologyReference(new OntologyReference()
+																  .setOntologyDbId(variableOntology.getOntologyPuid())
+																  // TODO: Update if Germinate changes away from this at any point
+																  .setOntologyName("Crop Ontology"));
+													  }
 
 													  HashMap<String, String> additionalInfo = new HashMap<>();
-													  if (setSize != null)
-														  variable.getAdditionalInfo().put("setSize", String.valueOf(setSize));
-													  if (isTimeseries != null)
-														  variable.getAdditionalInfo().put("isTimeseries", String.valueOf(isTimeseries));
-													  variable.setAdditionalInfo(additionalInfo);
+													  if (variable.getMethodSetSize() != null)
+														  additionalInfo.put("setSize", String.valueOf(variable.getMethodSetSize()));
+													  if (variable.getMethodIsTimeseries() != null)
+														  additionalInfo.put("isTimeseries", String.valueOf(variable.getMethodIsTimeseries()));
+													  result.setAdditionalInfo(additionalInfo);
 
-													  return variable;
+													  return result;
 												  }).collect(Collectors.toList());
 
 		long totalCount = context.fetchOne("SELECT FOUND_ROWS()").into(Long.class);
