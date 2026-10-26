@@ -6,7 +6,7 @@ import jakarta.ws.rs.Path;
 import jakarta.ws.rs.core.*;
 import jhi.germinate.resource.enums.UserType;
 import jhi.germinate.server.*;
-import jhi.germinate.server.database.codegen.enums.PhenotypesDatatype;
+import jhi.germinate.server.database.codegen.enums.*;
 import jhi.germinate.server.database.codegen.tables.records.*;
 import jhi.germinate.server.database.pojo.TraitRestrictions;
 import jhi.germinate.server.util.*;
@@ -21,12 +21,19 @@ import java.io.IOException;
 import java.sql.*;
 import java.util.*;
 
-import static jhi.germinate.server.database.codegen.tables.Datasets.*;
-import static jhi.germinate.server.database.codegen.tables.Phenotypecategories.PHENOTYPECATEGORIES;
-import static jhi.germinate.server.database.codegen.tables.Phenotypedata.*;
-import static jhi.germinate.server.database.codegen.tables.Phenotypes.*;
+import static jhi.germinate.server.database.codegen.tables.Datasets.DATASETS;
+import static jhi.germinate.server.database.codegen.tables.Methodontologies.METHODONTOLOGIES;
+import static jhi.germinate.server.database.codegen.tables.Methods.METHODS;
+import static jhi.germinate.server.database.codegen.tables.Ontologies.ONTOLOGIES;
+import static jhi.germinate.server.database.codegen.tables.Phenotypedata.PHENOTYPEDATA;
+import static jhi.germinate.server.database.codegen.tables.Scaleontologies.SCALEONTOLOGIES;
+import static jhi.germinate.server.database.codegen.tables.Scales.SCALES;
+import static jhi.germinate.server.database.codegen.tables.Traitontologies.TRAITONTOLOGIES;
+import static jhi.germinate.server.database.codegen.tables.Traits.TRAITS;
 import static jhi.germinate.server.database.codegen.tables.Trialsetup.TRIALSETUP;
-import static jhi.germinate.server.database.codegen.tables.Units.*;
+import static jhi.germinate.server.database.codegen.tables.Variableontologies.VARIABLEONTOLOGIES;
+import static jhi.germinate.server.database.codegen.tables.Variables.VARIABLES;
+import static jhi.germinate.server.database.codegen.tables.ViewTableTraits.VIEW_TABLE_TRAITS;
 
 @Path("brapi/v2/variables")
 public class ObservationVariableServerResource extends ObservationVariableBaseServerResource implements BrapiObservationVariableServerResource
@@ -54,94 +61,261 @@ public class ObservationVariableServerResource extends ObservationVariableBaseSe
 
 			for (ObservationVariable ov : newVariables)
 			{
-				PhenotypesDatatype dataType = switch (ov.getScale().getDataType())
+				ScalesDatatype dataType = switch (ov.getScale().getDataType())
 				{
-					case "Date" -> PhenotypesDatatype.date;
-					case "Duration", "Numeric", "Numerical" -> PhenotypesDatatype.numeric;
-					case "Ordinal" -> PhenotypesDatatype.categorical;
-					default -> PhenotypesDatatype.text;
+					case "Date" -> ScalesDatatype.date;
+					case "Duration", "Numeric", "Numerical" -> ScalesDatatype.numeric;
+					case "Ordinal" -> ScalesDatatype.categorical;
+					default -> ScalesDatatype.text;
 				};
 
-				UnitsRecord unit = ov.getScale() != null ? context.selectFrom(UNITS)
-																  .where(UNITS.UNIT_NAME.eq(ov.getScale().getScaleName()))
-																  .fetchAny() : null;
-				PhenotypecategoriesRecord category = StringUtils.isEmpty(ov.getTrait().getTraitClass()) ? null : context.selectFrom(PHENOTYPECATEGORIES)
-																														.where(PHENOTYPECATEGORIES.NAME.eq(ov.getTrait().getTraitClass()))
-																														.fetchAny();
-				PhenotypesRecord trait = context.selectFrom(PHENOTYPES)
-												.where(PHENOTYPES.NAME.eq(ov.getObservationVariableName()))
-												.and(PHENOTYPES.UNIT_ID.isNotDistinctFrom(unit == null ? null : unit.getId()))
-												.and(PHENOTYPES.CATEGORY_ID.isNotDistinctFrom(category == null ? null : category.getId()))
-												.and(PHENOTYPES.DATATYPE.eq(dataType))
-												.fetchAny();
+				MethodsRecord method = null;
+				ScalesRecord scale = null;
+				TraitsRecord trait = null;
 
-				if (ov.getScale() != null && unit == null && !StringUtils.isEmpty(ov.getScale().getScaleName()))
+				// Convert the METHOD
+				if (ov.getMethod() != null)
 				{
-					unit = context.newRecord(UNITS);
-					unit.setUnitName(ov.getScale().getScaleName());
-					unit.store();
-				}
+					Method m = ov.getMethod();
+					MethodsMethodClass mc = MethodsMethodClass.measurement;
 
-				if (!StringUtils.isEmpty(ov.getTrait().getTraitClass()) && category == null) {
-					category = context.newRecord(PHENOTYPECATEGORIES);
-					category.setName(ov.getTrait().getTraitClass());
-					category.store();
-				}
-
-				if (trait == null)
-				{
-					trait = context.newRecord(PHENOTYPES);
-					trait.setName(ov.getObservationVariableName());
-					trait.setDatatype(dataType);
-
-					if (ov.getScale() != null && ov.getScale().getValidValues() != null)
+					try
 					{
-						ValidValues vv = ov.getScale().getValidValues();
-						TraitRestrictions tr = new TraitRestrictions();
-
-						if (!StringUtils.isEmpty(vv.getMinimumValue()))
-						{
-							try
-							{
-								tr.setMin(Double.parseDouble(vv.getMinimumValue()));
-							}
-							catch (NumberFormatException e)
-							{
-								// Ignore this, invalid value
-							}
-						}
-						if (!StringUtils.isEmpty(vv.getMaximumValue()))
-						{
-							try
-							{
-								tr.setMax(Double.parseDouble(vv.getMaximumValue()));
-							}
-							catch (NumberFormatException e)
-							{
-								// Ignore this, invalid value
-							}
-						}
-						if (!CollectionUtils.isEmpty(vv.getCategories()))
-						{
-							tr.setCategories(new String[][]{vv.getCategories().stream().map(Category::getValue).toArray(String[]::new)});
-						}
-
-						trait.setRestrictions(tr);
+						mc = MethodsMethodClass.valueOf(m.getMethodClass());
+					}
+					catch (Exception e)
+					{
 					}
 
-					if (unit != null)
-						trait.setUnitId(unit.getId());
-					if (category != null)
-						trait.setCategoryId(category.getId());
+					method = context.selectFrom(METHODS)
+					                .where(METHODS.ID.cast(String.class).eq(m.getMethodDbId()).or(METHODS.NAME.eq(m.getMethodName())))
+					                .and(METHODS.METHOD_CLASS.isNotDistinctFrom(mc))
+					                .fetchAny();
 
-					trait.store();
+					if (method == null)
+					{
+						method = context.newRecord(METHODS);
+						method.setName(m.getMethodName());
+						method.setMethodClass(mc);
+						method.setIsTimeseries(true);
+						method.store();
+
+						if (m.getOntologyReference() != null && !StringUtils.isEmpty(m.getMethodPUI()))
+						{
+							OntologiesRecord ontology = ensureOntologyExists(context, m.getOntologyReference());
+
+							MethodontologiesRecord methodOntology = context.selectFrom(METHODONTOLOGIES)
+							                                             .where(METHODONTOLOGIES.METHOD_ID.eq(method.getId()))
+							                                             .and(METHODONTOLOGIES.ONTOLOGY_ID.eq(ontology.getId()))
+							                                             .and(METHODONTOLOGIES.ONTOLOGY_PUID.eq(m.getMethodPUI()))
+							                                             .fetchAny();
+
+							if (methodOntology == null)
+							{
+								methodOntology = context.newRecord(METHODONTOLOGIES);
+								methodOntology.setMethodId(method.getId());
+								methodOntology.setOntologyId(ontology.getId());
+								methodOntology.setOntologyPuid(m.getMethodPUI());
+								methodOntology.store();
+							}
+						}
+					}
 				}
 
-				ids.add(trait.getId());
+				// Convert the SCALE
+				if (ov.getScale() != null)
+				{
+					Scale s = ov.getScale();
+					scale = context.selectFrom(SCALES)
+					               .where(SCALES.ID.cast(String.class).eq(s.getScaleDbId()).or(SCALES.NAME.isNotDistinctFrom(s.getScaleName())))
+					               .and(SCALES.DATATYPE.eq(dataType))
+					               .fetchAny();
+
+					if (scale == null)
+					{
+						scale = context.newRecord(SCALES);
+						scale.setName(s.getScaleName());
+						scale.setDatatype(dataType);
+
+						TraitRestrictions traitRestrictions = null;
+
+						if (s.getValidValues() != null)
+						{
+							traitRestrictions = new TraitRestrictions();
+							try
+							{
+								traitRestrictions.setMin(Double.parseDouble(s.getValidValues().getMinimumValue()));
+							}
+							catch (Exception e)
+							{
+							}
+							try
+							{
+								traitRestrictions.setMax(Double.parseDouble(s.getValidValues().getMaximumValue()));
+							}
+							catch (Exception e)
+							{
+							}
+							if (!CollectionUtils.isEmpty(s.getValidValues().getCategories()))
+							{
+								String[] values = s.getValidValues().getCategories().stream().map(Category::getValue).toArray(String[]::new);
+								String[] labels = s.getValidValues().getCategories().stream().map(Category::getValue).toArray(String[]::new);
+
+								traitRestrictions.setCategories(new String[][]{values, labels});
+							}
+						}
+
+						scale.setRestrictions(traitRestrictions);
+						scale.store();
+
+						if (s.getOntologyReference() != null && !StringUtils.isEmpty(s.getScalePUI()))
+						{
+							OntologiesRecord ontology = ensureOntologyExists(context, s.getOntologyReference());
+
+							ScaleontologiesRecord scaleOntology = context.selectFrom(SCALEONTOLOGIES)
+							                                             .where(SCALEONTOLOGIES.SCALE_ID.eq(scale.getId()))
+							                                             .and(SCALEONTOLOGIES.ONTOLOGY_ID.eq(ontology.getId()))
+							                                             .and(SCALEONTOLOGIES.ONTOLOGY_PUID.eq(s.getScalePUI()))
+							                                             .fetchAny();
+
+							if (scaleOntology == null)
+							{
+								scaleOntology = context.newRecord(SCALEONTOLOGIES);
+								scaleOntology.setScaleId(scale.getId());
+								scaleOntology.setOntologyId(ontology.getId());
+								scaleOntology.setOntologyPuid(s.getScalePUI());
+								scaleOntology.store();
+							}
+						}
+					}
+				}
+
+				// Convert the TRAIT
+				if (ov.getTrait() != null)
+				{
+					Trait t = ov.getTrait();
+
+					TraitsTraitClass tc = TraitsTraitClass.other;
+
+					try
+					{
+						tc = TraitsTraitClass.valueOf(t.getTraitClass());
+					}
+					catch (Exception e)
+					{
+					}
+
+					trait = context.selectFrom(TRAITS)
+					               .where(TRAITS.ID.cast(String.class).eq(t.getTraitDbId()).or(TRAITS.NAME.isNotDistinctFrom(t.getTraitName())))
+					               .and(TRAITS.TRAIT_CLASS.isNotDistinctFrom(tc))
+					               .fetchAny();
+
+					if (trait == null)
+					{
+						trait = context.newRecord(TRAITS);
+						trait.setName(t.getTraitName());
+						trait.setDescription(t.getTraitDescription());
+						trait.setTraitClass(tc);
+						if (!CollectionUtils.isEmpty(t.getSynonyms()))
+							trait.setSynonyms(t.getSynonyms().toArray(new String[0]));
+						trait.store();
+
+						if (t.getOntologyReference() != null && !StringUtils.isEmpty(t.getTraitPUI()))
+						{
+							OntologiesRecord ontology = ensureOntologyExists(context, t.getOntologyReference());
+
+							TraitontologiesRecord traitOntology = context.selectFrom(TRAITONTOLOGIES)
+							                                             .where(TRAITONTOLOGIES.TRAIT_ID.eq(trait.getId()))
+							                                             .and(TRAITONTOLOGIES.ONTOLOGY_ID.eq(ontology.getId()))
+							                                             .and(TRAITONTOLOGIES.ONTOLOGY_PUID.eq(t.getTraitPUI()))
+							                                             .fetchAny();
+
+							if (traitOntology == null)
+							{
+								traitOntology = context.newRecord(TRAITONTOLOGIES);
+								traitOntology.setTraitId(trait.getId());
+								traitOntology.setOntologyId(ontology.getId());
+								traitOntology.setOntologyPuid(t.getTraitPUI());
+								traitOntology.store();
+							}
+						}
+					}
+				}
+
+				VariablesRecord variable;
+
+				if (StringUtils.isEmpty(ov.getObservationVariableDbId()))
+				{
+					// If an ID is passed in, assume everything is correct and just check the id
+					variable = context.selectFrom(VARIABLES).where(VARIABLES.ID.cast(String.class).eq(ov.getObservationVariableDbId())).fetchAny();
+				}
+				else
+				{
+					// Else, check for matches on TRAIT+SCALE+METHOD
+					variable = context.selectFrom(VARIABLES)
+					                  .where(VARIABLES.TRAIT_ID.isNotDistinctFrom(trait == null ? null : trait.getId()))
+					                  .and(VARIABLES.SCALE_ID.isNotDistinctFrom(scale == null ? null : scale.getId()))
+					                  .and(VARIABLES.METHOD_ID.isNotDistinctFrom(method == null ? null : method.getId()))
+					                  .fetchAny();
+				}
+
+				if (variable == null)
+				{
+					variable = context.newRecord(VARIABLES);
+					variable.setName(ov.getObservationVariableName());
+					variable.setTraitId(trait == null ? null : trait.getId());
+					variable.setScaleId(scale == null ? null : scale.getId());
+					variable.setMethodId(method == null ? null : method.getId());
+					variable.store();
+
+					if (ov.getOntologyReference() != null && !StringUtils.isEmpty(ov.getObservationVariablePUI()))
+					{
+						OntologiesRecord ontology = ensureOntologyExists(context, ov.getOntologyReference());
+
+						VariableontologiesRecord variableOntology = context.selectFrom(VARIABLEONTOLOGIES)
+						                                             .where(VARIABLEONTOLOGIES.VARIABLE_ID.eq(variable.getId()))
+						                                             .and(VARIABLEONTOLOGIES.ONTOLOGY_ID.eq(ontology.getId()))
+						                                             .and(VARIABLEONTOLOGIES.ONTOLOGY_PUID.eq(ov.getObservationVariablePUI()))
+						                                             .fetchAny();
+
+						if (variableOntology == null)
+						{
+							variableOntology = context.newRecord(VARIABLEONTOLOGIES);
+							variableOntology.setVariableId(variable.getId());
+							variableOntology.setOntologyId(ontology.getId());
+							variableOntology.setOntologyPuid(ov.getObservationVariablePUI());
+							variableOntology.store();
+						}
+					}
+				}
+
+				ids.add(variable.getId());
 			}
 
-			return getVariables(context, Collections.singletonList(PHENOTYPES.ID.in(ids)));
+			return getVariables(context, Collections.singletonList(VIEW_TABLE_TRAITS.VARIABLE_ID.in(ids)));
 		}
+	}
+
+	private OntologiesRecord ensureOntologyExists(DSLContext ctx, OntologyReference o)
+	{
+		String url = CollectionUtils.isEmpty(o.getDocumentationLinks()) ? "N/A" : o.getDocumentationLinks().getFirst().getURL();
+
+		OntologiesRecord ontology = ctx.selectFrom(ONTOLOGIES)
+		                               .where(ONTOLOGIES.ID.cast(String.class).eq(o.getOntologyDbId()).or(ONTOLOGIES.NAME.isNotDistinctFrom(o.getOntologyName())))
+		                               .and(ONTOLOGIES.VERSION.isNotDistinctFrom(o.getVersion()))
+		                               .and(ONTOLOGIES.URL.isNotDistinctFrom(url))
+		                               .fetchAny();
+
+		if (ontology == null)
+		{
+			ontology = ctx.newRecord(ONTOLOGIES);
+			ontology.setName(o.getOntologyName());
+			ontology.setVersion(o.getVersion());
+			ontology.setUrl(url);
+			ontology.store();
+		}
+
+		return ontology;
 	}
 
 	@Override
@@ -185,8 +359,8 @@ public class ObservationVariableServerResource extends ObservationVariableBaseSe
 			{
 				try
 				{
-					Integer traitId = Integer.parseInt(observationVariableDbId);
-					conditions.add(PHENOTYPES.ID.eq(traitId));
+					Integer variableId = Integer.parseInt(observationVariableDbId);
+					conditions.add(VIEW_TABLE_TRAITS.VARIABLE_ID.eq(variableId));
 				}
 				catch (NumberFormatException e)
 				{
@@ -194,7 +368,7 @@ public class ObservationVariableServerResource extends ObservationVariableBaseSe
 				}
 			}
 			if (!StringUtils.isEmpty(observationVariableName))
-				conditions.add(PHENOTYPES.NAME.eq(observationVariableName));
+				conditions.add(VIEW_TABLE_TRAITS.VARIABLE_NAME.eq(observationVariableName));
 			if (!StringUtils.isEmpty(studyDbId))
 			{
 				try
@@ -205,7 +379,7 @@ public class ObservationVariableServerResource extends ObservationVariableBaseSe
 						resp.sendError(Response.Status.FORBIDDEN.getStatusCode());
 						return null;
 					}
-					conditions.add(DSL.exists(DSL.selectOne().from(PHENOTYPEDATA).leftJoin(TRIALSETUP).on(TRIALSETUP.ID.eq(PHENOTYPEDATA.TRIALSETUP_ID)).where(TRIALSETUP.DATASET_ID.eq(datasetId)).and(PHENOTYPEDATA.PHENOTYPE_ID.eq(PHENOTYPES.ID))));
+					conditions.add(DSL.exists(DSL.selectOne().from(PHENOTYPEDATA).leftJoin(TRIALSETUP).on(TRIALSETUP.ID.eq(PHENOTYPEDATA.TRIALSETUP_ID)).where(TRIALSETUP.DATASET_ID.eq(datasetId)).and(PHENOTYPEDATA.VARIABLE_ID.eq(VIEW_TABLE_TRAITS.VARIABLE_ID))));
 				}
 				catch (NumberFormatException e)
 				{
@@ -217,7 +391,7 @@ public class ObservationVariableServerResource extends ObservationVariableBaseSe
 				try
 				{
 					Integer experimentId = Integer.parseInt(studyDbId);
-					conditions.add(DSL.exists(DSL.selectOne().from(PHENOTYPEDATA).leftJoin(TRIALSETUP).on(TRIALSETUP.ID.eq(PHENOTYPEDATA.TRIALSETUP_ID)).leftJoin(DATASETS).on(DATASETS.ID.eq(TRIALSETUP.DATASET_ID)).where(DATASETS.EXPERIMENT_ID.eq(experimentId)).and(PHENOTYPEDATA.PHENOTYPE_ID.eq(PHENOTYPES.ID))));
+					conditions.add(DSL.exists(DSL.selectOne().from(PHENOTYPEDATA).leftJoin(TRIALSETUP).on(TRIALSETUP.ID.eq(PHENOTYPEDATA.TRIALSETUP_ID)).leftJoin(DATASETS).on(DATASETS.ID.eq(TRIALSETUP.DATASET_ID)).where(DATASETS.EXPERIMENT_ID.eq(experimentId)).and(PHENOTYPEDATA.VARIABLE_ID.eq(VIEW_TABLE_TRAITS.VARIABLE_ID))));
 				}
 				catch (NumberFormatException e)
 				{

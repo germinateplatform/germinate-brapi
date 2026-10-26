@@ -17,8 +17,8 @@ import java.util.stream.Collectors;
 import static jhi.germinate.server.database.codegen.tables.Datasets.DATASETS;
 import static jhi.germinate.server.database.codegen.tables.Germinatebase.GERMINATEBASE;
 import static jhi.germinate.server.database.codegen.tables.Phenotypedata.PHENOTYPEDATA;
-import static jhi.germinate.server.database.codegen.tables.Phenotypes.PHENOTYPES;
 import static jhi.germinate.server.database.codegen.tables.Trialsetup.TRIALSETUP;
+import static jhi.germinate.server.database.codegen.tables.Variables.VARIABLES;
 
 public class ObservationUnitBaseServerResource extends BaseServerResource
 {
@@ -37,8 +37,8 @@ public class ObservationUnitBaseServerResource extends BaseServerResource
 													 TRIALSETUP.DATASET_ID.as("studyDbId"),
 													 DSL.jsonArrayAgg(
 															 DSL.jsonObject(
-																	 DSL.key("observationVariableDbId").value(PHENOTYPES.ID),
-																	 DSL.key("observationVariableName").value(PHENOTYPES.NAME),
+																	 DSL.key("observationVariableDbId").value(VARIABLES.ID),
+																	 DSL.key("observationVariableName").value(VARIABLES.NAME),
 																	 DSL.key("observationUnitDbId").value(PHENOTYPEDATA.ID),
 																	 DSL.key("observationTimeStamp").value(DSL.field("date_format(" + PHENOTYPEDATA.RECORDING_DATE.getName() + ", '%Y-%m-%dT%TZ')")),
 																	 DSL.key("value").value(PHENOTYPEDATA.PHENOTYPE_VALUE),
@@ -50,7 +50,7 @@ public class ObservationUnitBaseServerResource extends BaseServerResource
 											 )
 											 .from(TRIALSETUP)
 											 .leftJoin(PHENOTYPEDATA).on(TRIALSETUP.ID.eq(PHENOTYPEDATA.TRIALSETUP_ID))
-											 .leftJoin(PHENOTYPES).on(PHENOTYPES.ID.eq(PHENOTYPEDATA.PHENOTYPE_ID))
+											 .leftJoin(VARIABLES).on(VARIABLES.ID.eq(PHENOTYPEDATA.VARIABLE_ID))
 											 .leftJoin(DATASETS).on(DATASETS.ID.eq(TRIALSETUP.DATASET_ID))
 											 .leftJoin(GERMINATEBASE).on(GERMINATEBASE.ID.eq(TRIALSETUP.GERMINATEBASE_ID))
 											 .where(DATASETS.ID.in(datasetIds));

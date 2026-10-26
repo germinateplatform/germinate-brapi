@@ -24,8 +24,8 @@ import java.util.stream.Collectors;
 import static jhi.germinate.server.database.codegen.tables.Datasets.DATASETS;
 import static jhi.germinate.server.database.codegen.tables.Germinatebase.GERMINATEBASE;
 import static jhi.germinate.server.database.codegen.tables.Phenotypedata.PHENOTYPEDATA;
-import static jhi.germinate.server.database.codegen.tables.Phenotypes.PHENOTYPES;
 import static jhi.germinate.server.database.codegen.tables.Trialsetup.TRIALSETUP;
+import static jhi.germinate.server.database.codegen.tables.Variables.VARIABLES;
 
 @Path("brapi/v2/observations")
 @Secured
@@ -86,7 +86,7 @@ public class ObservationServerResource extends ObservationBaseServerResource imp
 			conditions.add(DATASETS.ID.in(requestedIds));
 			addCondition(conditions, DATASETS.EXPERIMENT_ID, trialDbId);
 			addCondition(conditions, TRIALSETUP.GERMINATEBASE_ID, germplasmDbId);
-			addCondition(conditions, PHENOTYPES.ID, observationVariableDbId);
+			addCondition(conditions, VARIABLES.ID, observationVariableDbId);
 
 			return getObservation(context, conditions);
 		}
@@ -106,7 +106,7 @@ public class ObservationServerResource extends ObservationBaseServerResource imp
 							.setData(new ArrayList<>()));
 		}
 
-		Set<Integer> traitIds = new HashSet<>();
+		Set<Integer> variableIds = new HashSet<>();
 		Set<Integer> germplasmIds = new HashSet<>();
 		Set<Integer> observationUnitIds = new HashSet<>();
 		Set<Integer> studyDbIds = new HashSet<>();
@@ -118,7 +118,7 @@ public class ObservationServerResource extends ObservationBaseServerResource imp
 		{
 			try
 			{
-				traitIds.add(Integer.parseInt(n.getObservationVariableDbId()));
+				variableIds.add(Integer.parseInt(n.getObservationVariableDbId()));
 			}
 			catch (Exception e)
 			{
@@ -176,15 +176,15 @@ public class ObservationServerResource extends ObservationBaseServerResource imp
 		try (Connection conn = Database.getConnection())
 		{
 			DSLContext context = Database.getContext(conn);
-			Integer traitCount = context.selectCount().from(PHENOTYPES).where(PHENOTYPES.ID.in(traitIds)).fetchAnyInto(Integer.class);
+			Integer variableCount = context.selectCount().from(VARIABLES).where(VARIABLES.ID.in(variableIds)).fetchAnyInto(Integer.class);
 			Integer germplasmCount = context.selectCount().from(GERMINATEBASE).where(GERMINATEBASE.ID.in(germplasmIds)).fetchAnyInto(Integer.class);
 			Integer observationUnitCount = context.selectCount().from(TRIALSETUP).where(TRIALSETUP.ID.in(observationUnitIds)).fetchAnyInto(Integer.class);
 
-			if (traitIds.size() != traitCount || germplasmIds.size() != germplasmCount || observationUnitIds.size() != observationUnitCount)
+			if (variableIds.size() != variableCount || germplasmIds.size() != germplasmCount || observationUnitIds.size() != observationUnitCount)
 			{
 				// Specified trait or germplasm not found
-				Logger.getLogger("").warning("INVALID REQUEST PARAMETERS: traits: " + traitIds.size() + ", " + traitCount + ", germplasm: " + germplasmIds.size() + ", " + germplasmCount + ", observationUnits: " + observationUnitIds.size() + ", " + observationUnitCount);
-				Logger.getLogger("").warning("TRAITS: " + traitIds);
+				Logger.getLogger("").warning("INVALID REQUEST PARAMETERS: traits: " + variableIds.size() + ", " + variableCount + ", germplasm: " + germplasmIds.size() + ", " + germplasmCount + ", observationUnits: " + observationUnitIds.size() + ", " + observationUnitCount);
+				Logger.getLogger("").warning("TRAITS: " + variableIds);
 				Logger.getLogger("").warning("GERMPLASM: " + germplasmIds);
 				Logger.getLogger("").warning("OBSERVATION UNITS: " + observationUnitIds);
 				resp.sendError(Response.Status.BAD_REQUEST.getStatusCode());
@@ -197,11 +197,11 @@ public class ObservationServerResource extends ObservationBaseServerResource imp
 			Map<String, PhenotypedataRecord> multiMapping = new HashMap<>();
 			Map<String, PhenotypedataRecord> singleMapping = new HashMap<>();
 			context.selectFrom(PHENOTYPEDATA)
-				   .where(PHENOTYPEDATA.PHENOTYPE_ID.in(traitIds))
+				   .where(PHENOTYPEDATA.VARIABLE_ID.in(variableIds))
 				   .and(PHENOTYPEDATA.TRIALSETUP_ID.in(observationUnitIds))
 				   .forEach(pd -> {
-					   String multiKey = pd.getPhenotypeId() + "|" + pd.getTrialsetupId() + "|" + pd.getRecordingDate() + "|" + pd.getPhenotypeValue();
-					   String singleKey = pd.getPhenotypeId() + "|" + pd.getTrialsetupId();
+					   String multiKey = pd.getVariableId() + "|" + pd.getTrialsetupId() + "|" + pd.getRecordingDate() + "|" + pd.getPhenotypeValue();
+					   String singleKey = pd.getVariableId() + "|" + pd.getTrialsetupId();
 
 					   multiMapping.put(multiKey, pd);
 					   singleMapping.put(singleKey, pd);
@@ -215,7 +215,7 @@ public class ObservationServerResource extends ObservationBaseServerResource imp
 				TrialsetupRecord observationUnit = observationUnits.get(o.getObservationUnitDbId());
 				PhenotypedataRecord pd = context.newRecord(PHENOTYPEDATA);
 				pd.setTrialsetupId(Integer.parseInt(o.getObservationUnitDbId()));
-				pd.setPhenotypeId(Integer.parseInt(o.getObservationVariableDbId()));
+				pd.setVariableId(Integer.parseInt(o.getObservationVariableDbId()));
 				pd.setPhenotypeValue(o.getValue());
 				try
 				{
@@ -311,7 +311,7 @@ public class ObservationServerResource extends ObservationBaseServerResource imp
 				if (isMultiTrait)
 				{
 					// Check if there's already an entry for the same plot, trait and timepoint and value
-					PhenotypedataRecord pdOld = multiMapping.get(pd.getPhenotypeId() + "|" + pd.getTrialsetupId() + "|" + pd.getRecordingDate() + "|" + pd.getPhenotypeValue());
+					PhenotypedataRecord pdOld = multiMapping.get(pd.getVariableId() + "|" + pd.getTrialsetupId() + "|" + pd.getRecordingDate() + "|" + pd.getPhenotypeValue());
 
 					if (pdOld == null)
 					{
@@ -326,7 +326,7 @@ public class ObservationServerResource extends ObservationBaseServerResource imp
 				else
 				{
 					// Otherwise, check if there's a match when ignoring the value. Single traits get their values updated if different
-					PhenotypedataRecord match = singleMapping.get(pd.getPhenotypeId() + "|" + pd.getTrialsetupId());
+					PhenotypedataRecord match = singleMapping.get(pd.getVariableId() + "|" + pd.getTrialsetupId());
 					if (match != null)
 					{
 						if (!Objects.equals(match.getPhenotypeValue(), pd.getPhenotypeValue()))

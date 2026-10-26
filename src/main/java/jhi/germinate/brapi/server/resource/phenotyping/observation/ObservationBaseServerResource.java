@@ -17,9 +17,8 @@ import java.util.stream.Collectors;
 import static jhi.germinate.server.database.codegen.tables.Datasets.DATASETS;
 import static jhi.germinate.server.database.codegen.tables.Germinatebase.GERMINATEBASE;
 import static jhi.germinate.server.database.codegen.tables.Phenotypedata.PHENOTYPEDATA;
-import static jhi.germinate.server.database.codegen.tables.Phenotypes.PHENOTYPES;
 import static jhi.germinate.server.database.codegen.tables.Trialsetup.TRIALSETUP;
-import static jhi.germinate.server.database.codegen.tables.Units.UNITS;
+import static jhi.germinate.server.database.codegen.tables.Variables.VARIABLES;
 
 public class ObservationBaseServerResource extends BaseServerResource
 {
@@ -32,8 +31,7 @@ public class ObservationBaseServerResource extends BaseServerResource
 											 .hint("SQL_CALC_FOUND_ROWS")
 											 .from(PHENOTYPEDATA)
 											 .leftJoin(TRIALSETUP).on(TRIALSETUP.ID.eq(PHENOTYPEDATA.TRIALSETUP_ID))
-											 .leftJoin(PHENOTYPES).on(PHENOTYPES.ID.eq(PHENOTYPEDATA.PHENOTYPE_ID))
-											 .leftJoin(UNITS).on(UNITS.ID.eq(PHENOTYPES.UNIT_ID))
+											 .leftJoin(VARIABLES).on(VARIABLES.ID.eq(PHENOTYPEDATA.VARIABLE_ID))
 											 .leftJoin(DATASETS).on(DATASETS.ID.eq(TRIALSETUP.DATASET_ID))
 											 .leftJoin(GERMINATEBASE).on(GERMINATEBASE.ID.eq(TRIALSETUP.GERMINATEBASE_ID))
 											 .where(DATASETS.ID.in(datasetIds));
@@ -55,8 +53,8 @@ public class ObservationBaseServerResource extends BaseServerResource
 					observation.setObservationDbId(o.get(PHENOTYPEDATA.ID, String.class));
 					observation.setStudyDbId(o.get(DATASETS.ID, String.class));
 					observation.setObservationUnitDbId(o.get(PHENOTYPEDATA.TRIALSETUP_ID, String.class));
-					observation.setObservationVariableDbId(o.get(PHENOTYPES.ID, String.class));
-					observation.setObservationVariableName(o.get(PHENOTYPES.NAME));
+					observation.setObservationVariableDbId(o.get(VARIABLES.ID, String.class));
+					observation.setObservationVariableName(o.get(VARIABLES.NAME));
 					observation.setValue(o.get(PHENOTYPEDATA.PHENOTYPE_VALUE));
 					Timestamp t = o.get(PHENOTYPEDATA.RECORDING_DATE);
 					if (t != null)
